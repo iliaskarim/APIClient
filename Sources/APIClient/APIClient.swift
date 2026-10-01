@@ -1,20 +1,20 @@
 import Foundation
 
-public actor APIClient {
-  public struct Endpoint<RequestBody, ResponseBody> {
-    let method: String
-    let path: String
+public struct Endpoint<RequestBody, ResponseBody> {
+  let method: String
+  let path: String
 
-    public init(path: String, method: String = "GET") {
-      self.path = path
-      self.method = method
-    }
+  public init(path: String, method: String = "GET") {
+    self.path = path
+    self.method = method
   }
+}
 
-  public typealias VoidBodyEndpoint = Endpoint<Void, Void>
-  public typealias VoidRequestBodyEndpoint<ResponseBody> = Endpoint<Void, ResponseBody>
-  public typealias VoidResponseBodyEndpoint<RequestBody> = Endpoint<RequestBody, Void>
+public typealias VoidBodyEndpoint = Endpoint<Void, Void>
+public typealias VoidRequestBodyEndpoint<ResponseBody> = Endpoint<Void, ResponseBody>
+public typealias VoidResponseBodyEndpoint<RequestBody> = Endpoint<RequestBody, Void>
 
+public actor APIClient {
   public var bearerToken: String?
 
   private let baseURL: URL
