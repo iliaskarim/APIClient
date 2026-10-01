@@ -26,14 +26,16 @@ struct Station: Codable {
 
 struct Measurement: Encodable {
   let stationId: String
-  let dt: Int
+  let dt: Date
   let temperature: Double
 }
 
 let encoder = JSONEncoder()
+encoder.dateEncodingStrategy = .secondsSince1970
 encoder.keyEncodingStrategy = .convertToSnakeCase
 
 let decoder = JSONDecoder()
+decoder.dateDecodingStrategy = .secondsSince1970
 decoder.keyDecodingStrategy = .convertFromSnakeCase
 
 let apiKey = "YOUR_API_KEY"
@@ -82,7 +84,7 @@ try await client.response(
   requestBody: [
     Measurement(
       stationId: created.id!,
-      dt: 1479817340,
+      dt: Date(timeIntervalSince1970: 1479817340),
       temperature: 18.7
     )
   ]
