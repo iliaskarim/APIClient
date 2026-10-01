@@ -22,28 +22,25 @@ struct Station: Codable {
   let latitude: Double
   let longitude: Double
   let altitude: Double
-
-  enum CodingKeys: String, CodingKey {
-    case id
-    case externalId = "external_id"
-    case name, latitude, longitude, altitude
-  }
 }
 
 struct Measurement: Encodable {
   let stationId: String
   let dt: Int
   let temperature: Double
-
-  enum CodingKeys: String, CodingKey {
-    case stationId = "station_id"
-    case dt, temperature
-  }
 }
+
+let encoder = JSONEncoder()
+encoder.keyEncodingStrategy = .convertToSnakeCase
+
+let decoder = JSONDecoder()
+decoder.keyDecodingStrategy = .convertFromSnakeCase
 
 let apiKey = "YOUR_API_KEY"
 let client = APIClient(
-  baseURL: URL(string: "https://api.openweathermap.org")!
+  baseURL: URL(string: "https://api.openweathermap.org")!,
+  encoder: encoder,
+  decoder: decoder
 )
 ```
 
