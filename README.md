@@ -12,14 +12,16 @@ The examples below use [OpenWeather’s Stations API](https://openweathermap.org
 
 ## Usage
 
+### Models
+
 ```swift
 struct Station: Codable {
-  var id: String?
-  var externalId: String
-  var name: String
-  var latitude: Double
-  var longitude: Double
-  var altitude: Double
+  let id: String?
+  let externalId: String
+  let name: String
+  let latitude: Double
+  let longitude: Double
+  let altitude: Double
 
   enum CodingKeys: String, CodingKey {
     case id
@@ -29,9 +31,9 @@ struct Station: Codable {
 }
 
 struct Measurement: Encodable {
-  var stationId: String
-  var dt: Int
-  var temperature: Double
+  let stationId: String
+  let dt: Int
+  let temperature: Double
 
   enum CodingKeys: String, CodingKey {
     case stationId = "station_id"
@@ -43,16 +45,27 @@ let apiKey = "YOUR_API_KEY"
 let client = APIClient(
   baseURL: URL(string: "https://api.openweathermap.org")!
 )
+```
 
-// No request body → Decodable response (GET /stations)
+### No request body → Decodable response
+
+`GET /stations` lists the stations on your account.
+
+```swift
 let stations: [Station] = try await client.response(
   endpoint: .init(path: "data/3.0/stations?appid=\(apiKey)")
 )
+```
 
-// Encodable request body → Decodable response (POST /stations)
+### Encodable request body → Decodable response
+
+`POST /stations` registers a station and returns it.
+
+```swift
 let created: Station = try await client.response(
   endpoint: .init(path: "data/3.0/stations?appid=\(apiKey)", method: "POST"),
   requestBody: Station(
+    id: nil,
     externalId: "SF_TEST001",
     name: "San Francisco Test Station",
     latitude: 37.76,
@@ -60,8 +73,13 @@ let created: Station = try await client.response(
     altitude: 150
   )
 )
+```
 
-// Encodable request body → no response body (POST /measurements)
+### Encodable request body → no response body
+
+`POST /measurements` uploads readings. A successful response is `204` with an empty body.
+
+```swift
 try await client.response(
   endpoint: .init(path: "data/3.0/measurements?appid=\(apiKey)", method: "POST"),
   requestBody: [
@@ -72,8 +90,13 @@ try await client.response(
     )
   ]
 )
+```
 
-// No request body → no response body (DELETE /stations/{id})
+### No request body → no response body
+
+`DELETE /stations/{id}` removes a station and its measurements. A successful response is `204` with an empty body.
+
+```swift
 try await client.response(
   endpoint: .init(
     path: "data/3.0/stations/\(created.id!)?appid=\(apiKey)",
