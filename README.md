@@ -2,8 +2,6 @@
 
 Bare-bones async JSON client. `Endpoint` is a path and an HTTP method. Call `response` to send it.
 
-The examples below use [OpenWeather’s Stations API](https://openweathermap.org/stations). Replace `YOUR_API_KEY` with your key.
-
 ## Installation
 
 ```swift
@@ -11,6 +9,8 @@ The examples below use [OpenWeather’s Stations API](https://openweathermap.org
 ```
 
 ## Usage
+
+`response` has four overloads, one for each combination of request body and response body: neither, request only, response only, or both. The sections below walk through each shape against [OpenWeather’s Stations API](https://openweathermap.org/stations). Replace `YOUR_API_KEY` with your key.
 
 ### Models
 
