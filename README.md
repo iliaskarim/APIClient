@@ -35,7 +35,6 @@ encoder.dateEncodingStrategy = .secondsSince1970
 encoder.keyEncodingStrategy = .convertToSnakeCase
 
 let decoder = JSONDecoder()
-decoder.dateDecodingStrategy = .secondsSince1970
 decoder.keyDecodingStrategy = .convertFromSnakeCase
 
 let apiKey = "YOUR_API_KEY"
