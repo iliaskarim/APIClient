@@ -20,11 +20,11 @@ struct Endpoint<RequestBody, ResponseBody> {
 typealias VoidRequestBodyEndpoint<ResponseBody> = Endpoint<Void, ResponseBody>
 ```
 
-`Void` here is a marker, not something you encode. It lets the type system tell a “GET that returns JSON” apart from later shapes such as “POST that returns nothing,” without putting that distinction into the method name.
+`Void` here is a marker, not something you encode. It lets the type system tell a “GET that returns JSON” apart from later shapes such as “POST that returns nothing,” without putting that distinction into the method name. OpenWeather’s Current Weather API only needs this GET shape, so we will implement one `response` overload and leave the others for APIs that actually accept bodies or return empty responses.
 
 ## Why an Actor?
 
-The client holds a base URL, a `URLSession`, and the JSON coder you configure once at launch. You will share one instance from SwiftUI views, refresh actions, and other async call sites. Marking the type as an `actor` gives that shared instance a safe home under Swift 6 concurrency: call sites `await` into it, and mutable configuration stays isolated on the actor.
+The client holds a base URL, a `URLSession`, and the JSON coder you configure once at launch. You will share one instance from SwiftUI views, pull-to-refresh, and other async call sites. Marking the type as an `actor` gives that shared instance a safe home under Swift 6 concurrency: call sites `await` into it, and any configuration that lives on the client stays isolated.
 
 ```swift
 actor APIClient {
@@ -47,7 +47,9 @@ actor APIClient {
 }
 ```
 
-This is not mainly about `JSONEncoder` / `JSONDecoder` being “not thread-safe.” The actor’s job is simpler: one client, many async callers, no data races. Pass a decoder already configured the way OpenWeather’s payloads need—for Current Weather, snake_case keys are enough:
+This is not mainly about `JSONEncoder` / `JSONDecoder` being “not thread-safe.” Recent Foundation even treats those types as sendable when you do not mutate their strategies while requests are in flight. The actor’s job is simpler: one client, many async callers, no data races around the values the client owns. If every stored property were an immutable `let` and you never needed isolation, a `final class` could work—but an actor is the straightforward default for a shared networking type.
+
+Pass a decoder already configured the way OpenWeather’s payloads need. For Current Weather, converting snake_case keys is enough; you do not need a date strategy because we will keep timestamps out of the small model below:
 
 ```swift
 let decoder = JSONDecoder()
@@ -61,7 +63,7 @@ let client = APIClient(
 
 ## Sending the Request
 
-Path joining, header setup, and status checking stay private. A successful response is any HTTP status in `200 ..< 300`; anything else becomes `URLError.badServerResponse`:
+Path joining, header setup, and status checking stay private. A successful response is any HTTP status in `200 ..< 300`; anything else becomes `URLError.badServerResponse`. That keeps the happy path short while still failing loudly when the server rejects the call:
 
 ```swift
 extension APIClient {
@@ -90,7 +92,7 @@ extension APIClient {
 }
 ```
 
-OpenWeather’s Current Weather API key and coordinates travel as query items on the path. Replace `YOUR_API_KEY` with the key from your OpenWeather account—the same setup as in the earlier forecast post:
+OpenWeather’s Current Weather API key and coordinates travel as query items on the path. Use the same Brooklyn coordinates and imperial units as the earlier post, and replace `YOUR_API_KEY` with the key from your OpenWeather account:
 
 ```swift
 let apiKey = "YOUR_API_KEY"
@@ -100,7 +102,7 @@ let path =
 
 ## Decoding the Response
 
-The GET overload takes a void-request endpoint, performs the request, and decodes the body. The return type is inferred from the call site:
+The GET overload takes a void-request endpoint, performs the request, and decodes the body. The return type is inferred from the call site, so you read `CurrentWeather` (or any other `Decodable`) without casting:
 
 ```swift
 extension APIClient {
@@ -115,7 +117,7 @@ extension APIClient {
 }
 ```
 
-You do not need every field OpenWeather returns. Decode the slice your UI cares about; unknown keys are ignored. For a simple readout of place, temperature, and condition:
+You do not need every field OpenWeather returns. Decode the slice your UI cares about; unknown keys are ignored. For a simple readout of place, temperature, humidity, and condition:
 
 ```swift
 struct CurrentWeather: Decodable {
@@ -135,22 +137,23 @@ struct CurrentWeather: Decodable {
 }
 ```
 
-`weather` is an array; treat the first element as primary, same as in the Current Weather walkthrough. Icon IDs still resolve with `https://openweathermap.org/img/wn/{icon}@2x.png`.
+`weather` is an array; treat the first element as primary, same as in the Current Weather walkthrough. Icon IDs still resolve with `https://openweathermap.org/img/wn/{icon}@2x.png` when you are ready to show artwork instead of the description string alone.
 
 ## Putting It Together
 
-With the client and model in place, the call site is one `await`:
+With the client and model in place, the call site is one `await`. Create the endpoint inline, or store it next to the screen that loads forecast data:
 
 ```swift
 let forecast: CurrentWeather = try await client.response(
   endpoint: .init(path: path)
 )
 
-print(forecast.name, forecast.main.temp, forecast.weather.first?.description ?? "")
+let condition = forecast.weather.first?.description ?? "Unknown"
+print("\(forecast.name): \(forecast.main.temp)°F, \(condition)")
 ```
 
-That is the whole GET path: describe the endpoint, share an actor-isolated client, decode into a small `Decodable` type. The same `Endpoint` generics leave room for request bodies and empty responses later, but you do not need those shapes to ship a weather screen.
+That is the whole GET path: describe the endpoint, share an actor-isolated client, decode into a small `Decodable` type. The same `Endpoint` generics leave room for request bodies and empty responses later, but you do not need those shapes to ship a weather screen that shows OpenWeather’s current conditions.
 
 ## Conclusion
 
-We’ve built a bare-bones async JSON client—an `Endpoint` for method and path, an `actor` so one instance can be shared safely, and a `response` overload that GETs and decodes. Pointed at OpenWeather’s Current Weather API, that is enough to load Brooklyn’s forecast behind a single call site. From here you can grow the decoded model, add a 5-day endpoint with another path, or extend `response` for POST and DELETE when an API actually needs them.
+We’ve built a bare-bones async JSON client—an `Endpoint` for method and path, an `actor` so one instance can be shared safely from async call sites, and a `response` overload that GETs and decodes. Pointed at OpenWeather’s Current Weather API, that is enough to load Brooklyn’s forecast behind a single call site. From here you can grow the decoded model with more of the fields from the earlier OpenWeather post, add a 5-day endpoint with another path, or extend `response` for POST and DELETE when an API actually needs them.
