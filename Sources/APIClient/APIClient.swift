@@ -3,12 +3,12 @@ import Foundation
 public struct Endpoint<RequestBody, ResponseBody> {
   let method: String
   let path: String
-  let queryItems: [URLQueryItem]
+  let queryItems: [String: String]
 
   public init(
     path: String,
     method: String = "GET",
-    queryItems: [URLQueryItem] = []
+    queryItems: [String: String] = [:]
   ) {
     self.path = path
     self.method = method
@@ -103,13 +103,15 @@ public actor APIClient {
     return request
   }
 
-  private func url(for path: String, queryItems: [URLQueryItem]) -> URL {
+  private func url(for path: String, queryItems: [String: String]) -> URL {
     let url = baseURL.appending(path: path)
     guard !queryItems.isEmpty,
           var components = URLComponents(url: url, resolvingAgainstBaseURL: false) else {
       return url
     }
-    components.queryItems = queryItems
+    components.queryItems = queryItems.map { name, value in
+      URLQueryItem(name: name, value: value)
+    }
     return components.url ?? url
   }
 }
