@@ -10,12 +10,12 @@ Start with the value that describes *what* to call. An `Endpoint` carries an HTT
 struct Endpoint<RequestBody, ResponseBody> {
   let method: String
   let path: String
-  let queryItems: [URLQueryItem]
+  let queryItems: [String: String]
 
   init(
     path: String,
     method: String = "GET",
-    queryItems: [URLQueryItem] = []
+    queryItems: [String: String] = [:]
   ) {
     self.path = path
     self.method = method
@@ -26,7 +26,7 @@ struct Endpoint<RequestBody, ResponseBody> {
 typealias VoidRequestBodyEndpoint<ResponseBody> = Endpoint<Void, ResponseBody>
 ```
 
-Keep the path as the resource alone—for Current Weather that is `data/2.5/weather`. Parameters such as `appid`, `lat`, and `lon` belong in `queryItems`, the same separate inputs you used in the earlier OpenWeather post. `Void` on the request body is only a marker, not something you encode. It lets the type system tell a “GET that returns JSON” apart from later shapes such as “POST that returns nothing,” without putting that distinction into the method name. OpenWeather’s Current Weather API only needs this GET shape, so we will implement one `response` overload and leave the others for APIs that actually accept bodies or return empty responses.
+Keep the path as the resource alone—for Current Weather that is `data/2.5/weather`. Parameters such as `appid`, `lat`, and `lon` belong in a `[String: String]` of `queryItems`, the same separate inputs you used in the earlier OpenWeather post. `Void` on the request body is only a marker, not something you encode. It lets the type system tell a “GET that returns JSON” apart from later shapes such as “POST that returns nothing,” without putting that distinction into the method name. OpenWeather’s Current Weather API only needs this GET shape, so we will implement one `response` overload and leave the others for APIs that actually accept bodies or return empty responses.
 
 ## Why an Actor?
 
@@ -73,13 +73,15 @@ Path joining, query attachment, header setup, and status checking stay private. 
 
 ```swift
 extension APIClient {
-  private func url(for path: String, queryItems: [URLQueryItem]) -> URL {
+  private func url(for path: String, queryItems: [String: String]) -> URL {
     let url = baseURL.appending(path: path)
     guard !queryItems.isEmpty,
           var components = URLComponents(url: url, resolvingAgainstBaseURL: false) else {
       return url
     }
-    components.queryItems = queryItems
+    components.queryItems = queryItems.map { name, value in
+      URLQueryItem(name: name, value: value)
+    }
     return components.url ?? url
   }
 
@@ -104,16 +106,16 @@ extension APIClient {
 }
 ```
 
-`URLComponents` is what turns your `URLQueryItem` list into a real query string. Use the same Brooklyn coordinates and imperial units as the earlier post, and replace `YOUR_API_KEY` with the key from your OpenWeather account:
+`URLComponents` builds the query string; `map` turns each dictionary entry into a `URLQueryItem`. Use the same Brooklyn coordinates and imperial units as the earlier post, and replace `YOUR_API_KEY` with the key from your OpenWeather account:
 
 ```swift
 let apiKey = "YOUR_API_KEY"
 let path = "data/2.5/weather"
 let queryItems = [
-  URLQueryItem(name: "appid", value: apiKey),
-  URLQueryItem(name: "lat", value: "40.6501"),
-  URLQueryItem(name: "lon", value: "-73.9496"),
-  URLQueryItem(name: "units", value: "imperial"),
+  "appid": apiKey,
+  "lat": "40.6501",
+  "lon": "-73.9496",
+  "units": "imperial",
 ]
 ```
 
