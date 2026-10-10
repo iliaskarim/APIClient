@@ -68,7 +68,15 @@ Path joining, header setup, and status checking stay private. A successful respo
 ```swift
 extension APIClient {
   private func url(for path: String) -> URL {
-    baseURL.appending(path: path)
+    let parts = path.split(separator: "?", maxSplits: 1, omittingEmptySubsequences: false)
+    let url = baseURL.appending(path: String(parts[0]))
+    guard parts.count == 2,
+          var components = URLComponents(url: url, resolvingAgainstBaseURL: false) else {
+      return url
+    }
+    // appending(path:) percent-encodes "?", which would bury the query in the path.
+    components.percentEncodedQuery = String(parts[1])
+    return components.url ?? url
   }
 
   private func request(url: URL, method: String) -> URLRequest {
@@ -92,7 +100,7 @@ extension APIClient {
 }
 ```
 
-OpenWeather’s Current Weather API key and coordinates travel as query items on the path. Use the same Brooklyn coordinates and imperial units as the earlier post, and replace `YOUR_API_KEY` with the key from your OpenWeather account:
+OpenWeather’s Current Weather API key and coordinates travel as query items on the path. The split above keeps that query out of `appending(path:)`, which would otherwise percent-encode `?` and treat the parameters as part of the path. Use the same Brooklyn coordinates and imperial units as the earlier post, and replace `YOUR_API_KEY` with the key from your OpenWeather account:
 
 ```swift
 let apiKey = "YOUR_API_KEY"
