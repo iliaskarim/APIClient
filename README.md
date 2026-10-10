@@ -10,7 +10,7 @@ Bare-bones async JSON client. `Endpoint` is a path and an HTTP method. Call `res
 
 ## Usage
 
-`response` has four overloads, one for each combination of request body and response body: neither, request only, response only, or both. The sections below walk through each shape against [OpenWeather’s Stations API](https://openweathermap.org/stations). Replace `YOUR_API_KEY` with your key.
+`response` has four overloads, one for each combination of request body and response body: neither, request only, response only, or both. The sections below walk through each shape against [OpenWeather’s Stations API](https://openweathermap.org/stations)—one real API that exposes every combination. You do not need a physical weather station: register a test station, upload sample readings, then delete the station when you are done. Replace `YOUR_API_KEY` with your key.
 
 ### Models
 
