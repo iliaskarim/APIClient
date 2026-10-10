@@ -1,26 +1,32 @@
 # How to Build a Bare-Bones Async JSON Client in Swift
 
-In this tutorial we will learn how to build a small async JSON API client in Swift and use it to fetch the current weather from OpenWeather. The client stays intentionally thin: an endpoint is a path and an HTTP method, and a single `response` call sends the request and decodes JSON. If you already followed [How to Retrieve the Current Weather Forecast from OpenWeather](/how-to-retrieve-the-current-weather-forecast-from-openweather), this post is the next step—wrapping that same endpoint in a reusable client instead of hand-rolling `URLSession` at every call site.
+In this tutorial we will learn how to build a small async JSON API client in Swift and use it to fetch the current weather from OpenWeather. The client stays intentionally thin: an endpoint is a path, an HTTP method, and optional query items, and a single `response` call sends the request and decodes JSON. If you already followed [How to Retrieve the Current Weather Forecast from OpenWeather](/how-to-retrieve-the-current-weather-forecast-from-openweather), this post is the next step—wrapping that same endpoint in a reusable client instead of hand-rolling `URLSession` at every call site.
 
 ## Getting Started
 
-Start with the value that describes *what* to call. An `Endpoint` carries an HTTP method and a path. The two generic parameters record whether the call has a JSON request body and whether it expects a JSON response body. For a weather GET we only need the response side, so the request body type is `Void`:
+Start with the value that describes *what* to call. An `Endpoint` carries an HTTP method, a path, and any query parameters. The two generic parameters record whether the call has a JSON request body and whether it expects a JSON response body. For a weather GET we only need the response side, so the request body type is `Void`:
 
 ```swift
 struct Endpoint<RequestBody, ResponseBody> {
   let method: String
   let path: String
+  let queryItems: [URLQueryItem]
 
-  init(path: String, method: String = "GET") {
+  init(
+    path: String,
+    method: String = "GET",
+    queryItems: [URLQueryItem] = []
+  ) {
     self.path = path
     self.method = method
+    self.queryItems = queryItems
   }
 }
 
 typealias VoidRequestBodyEndpoint<ResponseBody> = Endpoint<Void, ResponseBody>
 ```
 
-`Void` here is a marker, not something you encode. It lets the type system tell a “GET that returns JSON” apart from later shapes such as “POST that returns nothing,” without putting that distinction into the method name. OpenWeather’s Current Weather API only needs this GET shape, so we will implement one `response` overload and leave the others for APIs that actually accept bodies or return empty responses.
+Keep the path as the resource alone—for Current Weather that is `data/2.5/weather`. Parameters such as `appid`, `lat`, and `lon` belong in `queryItems`, the same separate inputs you used in the earlier OpenWeather post. `Void` on the request body is only a marker, not something you encode. It lets the type system tell a “GET that returns JSON” apart from later shapes such as “POST that returns nothing,” without putting that distinction into the method name. OpenWeather’s Current Weather API only needs this GET shape, so we will implement one `response` overload and leave the others for APIs that actually accept bodies or return empty responses.
 
 ## Why an Actor?
 
@@ -63,19 +69,17 @@ let client = APIClient(
 
 ## Sending the Request
 
-Path joining, header setup, and status checking stay private. A successful response is any HTTP status in `200 ..< 300`; anything else becomes `URLError.badServerResponse`. That keeps the happy path short while still failing loudly when the server rejects the call:
+Path joining, query attachment, header setup, and status checking stay private. A successful response is any HTTP status in `200 ..< 300`; anything else becomes `URLError.badServerResponse`. That keeps the happy path short while still failing loudly when the server rejects the call:
 
 ```swift
 extension APIClient {
-  private func url(for path: String) -> URL {
-    let parts = path.split(separator: "?", maxSplits: 1, omittingEmptySubsequences: false)
-    let url = baseURL.appending(path: String(parts[0]))
-    guard parts.count == 2,
+  private func url(for path: String, queryItems: [URLQueryItem]) -> URL {
+    let url = baseURL.appending(path: path)
+    guard !queryItems.isEmpty,
           var components = URLComponents(url: url, resolvingAgainstBaseURL: false) else {
       return url
     }
-    // appending(path:) percent-encodes "?", which would bury the query in the path.
-    components.percentEncodedQuery = String(parts[1])
+    components.queryItems = queryItems
     return components.url ?? url
   }
 
@@ -100,12 +104,17 @@ extension APIClient {
 }
 ```
 
-OpenWeather’s Current Weather API key and coordinates travel as query items on the path. The split above keeps that query out of `appending(path:)`, which would otherwise percent-encode `?` and treat the parameters as part of the path. Use the same Brooklyn coordinates and imperial units as the earlier post, and replace `YOUR_API_KEY` with the key from your OpenWeather account:
+`URLComponents` is what turns your `URLQueryItem` list into a real query string. Use the same Brooklyn coordinates and imperial units as the earlier post, and replace `YOUR_API_KEY` with the key from your OpenWeather account:
 
 ```swift
 let apiKey = "YOUR_API_KEY"
-let path =
-  "data/2.5/weather?appid=\(apiKey)&lat=40.6501&lon=-73.9496&units=imperial"
+let path = "data/2.5/weather"
+let queryItems = [
+  URLQueryItem(name: "appid", value: apiKey),
+  URLQueryItem(name: "lat", value: "40.6501"),
+  URLQueryItem(name: "lon", value: "-73.9496"),
+  URLQueryItem(name: "units", value: "imperial"),
+]
 ```
 
 ## Decoding the Response
@@ -117,7 +126,7 @@ extension APIClient {
   func response<ResponseBody: Decodable>(
     endpoint: VoidRequestBodyEndpoint<ResponseBody>
   ) async throws -> ResponseBody {
-    let url = url(for: endpoint.path)
+    let url = url(for: endpoint.path, queryItems: endpoint.queryItems)
     let request = request(url: url, method: endpoint.method)
     let data = try await performRequest(request)
     return try decoder.decode(ResponseBody.self, from: data)
@@ -153,7 +162,7 @@ With the client and model in place, the call site is one `await`. Create the end
 
 ```swift
 let forecast: CurrentWeather = try await client.response(
-  endpoint: .init(path: path)
+  endpoint: .init(path: path, queryItems: queryItems)
 )
 
 let condition = forecast.weather.first?.description ?? "Unknown"
@@ -164,4 +173,4 @@ That is the whole GET path: describe the endpoint, share an actor-isolated clien
 
 ## Conclusion
 
-We’ve built a bare-bones async JSON client—an `Endpoint` for method and path, an `actor` so one instance can be shared safely from async call sites, and a `response` overload that GETs and decodes. Pointed at OpenWeather’s Current Weather API, that is enough to load Brooklyn’s forecast behind a single call site. From here you can grow the decoded model with more of the fields from the earlier OpenWeather post, add a 5-day endpoint with another path, or extend `response` for POST and DELETE when an API actually needs them.
+We’ve built a bare-bones async JSON client—an `Endpoint` for method, path, and query items, an `actor` so one instance can be shared safely from async call sites, and a `response` overload that GETs and decodes. Pointed at OpenWeather’s Current Weather API, that is enough to load Brooklyn’s forecast behind a single call site. From here you can grow the decoded model with more of the fields from the earlier OpenWeather post, add a 5-day endpoint with another path, or extend `response` for POST and DELETE when an API actually needs them.
