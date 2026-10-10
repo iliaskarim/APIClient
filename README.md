@@ -21,6 +21,6 @@ let client = APIClient(
 )
 
 let flags: [String: Flag] = try await client.response(
-  endpoint: .init(path: "/features")
+  endpoint: Endpoint(path: "/features")
 )
 ```
