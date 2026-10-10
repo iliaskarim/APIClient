@@ -98,6 +98,14 @@ public actor APIClient {
   }
 
   private func url(for path: String) -> URL {
-    baseURL.appending(path: path)
+    let parts = path.split(separator: "?", maxSplits: 1, omittingEmptySubsequences: false)
+    let url = baseURL.appending(path: String(parts[0]))
+    guard parts.count == 2,
+          var components = URLComponents(url: url, resolvingAgainstBaseURL: false) else {
+      return url
+    }
+    // appending(path:) percent-encodes "?", which would bury the query in the path.
+    components.percentEncodedQuery = String(parts[1])
+    return components.url ?? url
   }
 }
