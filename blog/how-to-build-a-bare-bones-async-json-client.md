@@ -26,7 +26,7 @@ struct Endpoint<RequestBody, ResponseBody> {
 typealias VoidRequestBodyEndpoint<ResponseBody> = Endpoint<Void, ResponseBody>
 ```
 
-Keep the path as the resource alone—for Current Weather that is `data/2.5/weather`. Parameters such as `appid`, `lat`, and `lon` belong in a `[String: String]` of `queryItems`, the same separate inputs you used in the earlier OpenWeather post. `Void` on the request body is only a marker, not something you encode. It lets the type system tell a “GET that returns JSON” apart from later shapes such as “POST that returns nothing,” without putting that distinction into the method name. OpenWeather’s Current Weather API only needs this GET shape, so we will implement one `response` overload and leave the others for APIs that actually accept bodies or return empty responses.
+Keep the path as the resource alone—for Current Weather that is `data/2.5/weather`. Parameters such as `appid`, `lat`, and `lon` belong in a `[String: String]` of `queryItems`, the same separate inputs you used in the [earlier OpenWeather post](/how-to-retrieve-the-current-weather-forecast-from-openweather). `Void` on the request body is only a marker, not something you encode. It lets the type system tell a “GET that returns JSON” apart from later shapes such as “POST that returns nothing,” without putting that distinction into the method name. OpenWeather’s Current Weather API only needs this GET shape, so we will implement one `response` overload and leave the others for APIs that actually accept bodies or return empty responses.
 
 ## Why an Actor?
 
@@ -106,7 +106,7 @@ extension APIClient {
 }
 ```
 
-`URLComponents` builds the query string; `map` turns each dictionary entry into a `URLQueryItem`. Use the same Brooklyn coordinates and imperial units as the earlier post, and replace `YOUR_API_KEY` with the key from your OpenWeather account:
+`URLComponents` builds the query string; `map` turns each dictionary entry into a `URLQueryItem`. Use the same Brooklyn coordinates and imperial units as the [earlier OpenWeather post](/how-to-retrieve-the-current-weather-forecast-from-openweather), and replace `YOUR_API_KEY` with the key from your OpenWeather account:
 
 ```swift
 let apiKey = "YOUR_API_KEY"
@@ -175,4 +175,4 @@ That is the whole GET path: describe the endpoint, share an actor-isolated clien
 
 ## Conclusion
 
-We’ve built a bare-bones async JSON client—an `Endpoint` for method, path, and query items, an `actor` so one instance can be shared safely from async call sites, and a `response` overload that GETs and decodes. Pointed at OpenWeather’s Current Weather API, that is enough to load Brooklyn’s forecast behind a single call site. From here you can grow the decoded model with more of the fields from the earlier OpenWeather post, add a 5-day endpoint with another path, or extend `response` for POST and DELETE when an API actually needs them.
+We’ve built a bare-bones async JSON client—an `Endpoint` for method, path, and query items, an `actor` so one instance can be shared safely from async call sites, and a `response` overload that GETs and decodes. Pointed at OpenWeather’s Current Weather API, that is enough to load Brooklyn’s forecast behind a single call site. From here you can grow the decoded model with more of the fields from the [earlier OpenWeather post](/how-to-retrieve-the-current-weather-forecast-from-openweather), add a 5-day endpoint with another path, or extend `response` for POST and DELETE when an API actually needs them.
