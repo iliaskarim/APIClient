@@ -98,4 +98,4 @@ Neither approach hides the key inside a shipped `.ipa`. Anything readable from `
 
 We’ve replaced a hard-coded OpenWeather key with two layered options: scheme environment variables for the quick local path, and a gitignored `.xcconfig` plus Info.plist for a build that scales past one scheme. Start with the scheme if you are still sketching the forecast UI; graduate to `.xcconfig` when tests, teammates, or CI need the same key without copying a secret into Swift. In both cases, the call site stays a single `OpenWeatherConfig.apiKey`—only the delivery mechanism changes.
 
-*Cover image generated for this post.*
+*Cover: [Old key and laptop](https://commons.wikimedia.org/wiki/File:Old_key_and_laptop.jpg) by [Nikowsk](https://commons.wikimedia.org/wiki/User:Nikowsk), [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/).*
