@@ -106,7 +106,7 @@ extension APIClient {
 }
 ```
 
-`URLComponents` builds the query string; `map` turns each dictionary entry into a `URLQueryItem`. Use the same Brooklyn coordinates and imperial units as the [earlier OpenWeather post](/how-to-retrieve-the-current-weather-forecast-from-openweather), and replace `YOUR_API_KEY` with the key from your OpenWeather account:
+`URLComponents` builds the query string; `map` turns each dictionary entry into a `URLQueryItem`. Plug in your own latitude and longitude—the sample below uses Brooklyn only as an example—along with imperial units, and replace `YOUR_API_KEY` with the key from your OpenWeather account:
 
 ```swift
 let apiKey = "YOUR_API_KEY"
