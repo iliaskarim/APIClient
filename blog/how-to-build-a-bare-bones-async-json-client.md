@@ -106,7 +106,7 @@ extension APIClient {
 }
 ```
 
-`URLComponents` builds the query string; `map` turns each dictionary entry into a `URLQueryItem`. Plug in your own latitude and longitude—the sample below uses Brooklyn only as an example—along with imperial units, and replace `YOUR_API_KEY` with the key from your OpenWeather account:
+`URLComponents` builds the query string; `map` turns each dictionary entry into a `URLQueryItem`. Plug in your own latitude and longitude along with imperial units, and replace `YOUR_API_KEY` with the key from your OpenWeather account:
 
 ```swift
 let apiKey = "YOUR_API_KEY"
@@ -176,3 +176,5 @@ That is the whole GET path: describe the endpoint, share an actor-isolated clien
 ## Conclusion
 
 We’ve built a bare-bones async JSON client—an `Endpoint` for method, path, and query items, an `actor` so one instance can be shared safely from async call sites, and a `response` overload that GETs and decodes. Pointed at OpenWeather’s Current Weather API, that is enough to load Brooklyn’s forecast behind a single call site. From here you can grow the decoded model with more of the fields from the [earlier OpenWeather post](/how-to-retrieve-the-current-weather-forecast-from-openweather), add a 5-day endpoint with another path, or extend `response` for POST and DELETE when an API actually needs them.
+
+*Cover image generated for this post.*
