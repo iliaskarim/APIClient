@@ -1,6 +1,6 @@
 # How to Keep API Keys Out of Source Control
 
-In this tutorial we will learn how to keep an API key out of your Swift weather app’s source control. Hard-coding the key in a string literal is fine for a walkthrough, risky the moment that file is committed. We will start with environment variables in an Xcode scheme, then move to an `.xcconfig` file, and compare when each approach earns its keep.
+In this tutorial we will learn how to keep an API key out of your Swift weather app’s source control. Hard-coding the key in a string literal is fine for a walkthrough, risky the moment that file is committed. If you already followed [How to Build a Bare-Bones Async JSON Client in Swift](/how-to-build-a-bare-bones-async-json-client-in-swift), this post is the next step—only the way you *load* `apiKey` changes. We will start with environment variables in an Xcode scheme, then move to an `.xcconfig` file, and compare when each approach earns its keep.
 
 ## Getting Started
 
@@ -10,7 +10,7 @@ Hard-coding the key is the failure mode we want to leave behind:
 let apiKey = "YOUR_API_KEY"
 ```
 
-Once that real key replaces the placeholder, `git commit` publishes a secret to every clone of the repo. Keys are easy to rotate, but the habit matters: treat the key like a password, not like sample data. The rest of this post assumes a call site that already passes `apiKey` into a request—only the way you *load* that value changes.
+Once that real key replaces the placeholder, `git commit` publishes a secret to every clone of the repo. Keys are easy to rotate, but the habit matters: treat the key like a password, not like sample data. The rest of this post assumes the same call site from the [earlier async JSON client post](/how-to-build-a-bare-bones-async-json-client-in-swift)—only the way you *load* `apiKey` changes.
 
 ## Environment Variables First
 
