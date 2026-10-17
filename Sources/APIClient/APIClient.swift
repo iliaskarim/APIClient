@@ -77,6 +77,7 @@ public actor APIClient {
           (200 ..< 300).contains(httpResponse.statusCode) else {
       throw URLError(.badServerResponse)
     }
+
     return data
   }
 
@@ -90,7 +91,7 @@ public actor APIClient {
     return request
   }
 
-  private func request<Body: Encodable>(url: URL, method: String, body: Body) throws -> URLRequest {
+  private func request(url: URL, method: String, body: some Encodable) throws -> URLRequest {
     var request = request(url: url, method: method)
     request.setValue("application/json", forHTTPHeaderField: "Content-Type")
     request.httpBody = try encoder.encode(body)
