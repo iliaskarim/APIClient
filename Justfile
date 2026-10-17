@@ -5,3 +5,7 @@ set default-list := true
 lint:
     swiftformat .
     swiftlint lint .
+
+# Run SwiftLint analyzer rules against a clean build log.
+analyze:
+    bash scripts/swiftlint-analyze

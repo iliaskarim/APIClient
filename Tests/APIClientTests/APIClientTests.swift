@@ -75,5 +75,7 @@ func responseSendsTheRequestAndDecodesTheBody() async throws {
   ])
   #expect(decoded.name == "Brooklyn")
   #expect(decoded.main.temp == 72.5)
+  #expect(decoded.main.humidity == 61)
   #expect(decoded.weather.first?.description == "clear sky")
+  #expect(decoded.weather.first?.icon == "01d")
 }
