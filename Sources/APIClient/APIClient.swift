@@ -110,6 +110,7 @@ public actor APIClient {
           var components = URLComponents(url: url, resolvingAgainstBaseURL: false) else {
       return url
     }
+
     components.queryItems = queryItems.map { name, value in
       URLQueryItem(name: name, value: value)
     }
