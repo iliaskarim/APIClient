@@ -1,0 +1,15 @@
+{
+  "originHash" : "d3d867e9a010354e3073af9204164cc3f2a3ca6c87b49b318d810b5a065ca2be",
+  "pins" : [
+    {
+      "identity" : "fixtureurlprotocol",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/iliaskarim/FixtureURLProtocol.git",
+      "state" : {
+        "branch" : "main",
+        "revision" : "237a2fb58439951b08f281e092bac671a791b641"
+      }
+    }
+  ],
+  "version" : 3
+}

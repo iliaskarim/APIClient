@@ -3,10 +3,16 @@ import Foundation
 public struct Endpoint<RequestBody, ResponseBody> {
   let method: String
   let path: String
+  let queryItems: [String: String]
 
-  public init(path: String, method: String = "GET") {
+  public init(
+    path: String,
+    method: String = "GET",
+    queryItems: [String: String] = [:]
+  ) {
     self.path = path
     self.method = method
+    self.queryItems = queryItems
   }
 }
 
@@ -23,7 +29,7 @@ public actor APIClient {
   private let session: URLSession
 
   public func response(endpoint: VoidBodyEndpoint) async throws {
-    let url = url(for: endpoint.path)
+    let url = url(for: endpoint.path, queryItems: endpoint.queryItems)
     let request = request(url: url, method: endpoint.method)
     try await performRequest(request)
   }
@@ -32,7 +38,7 @@ public actor APIClient {
     endpoint: VoidResponseBodyEndpoint<RequestBody>,
     requestBody: RequestBody
   ) async throws {
-    let url = url(for: endpoint.path)
+    let url = url(for: endpoint.path, queryItems: endpoint.queryItems)
     let request = try request(url: url, method: endpoint.method, body: requestBody)
     try await performRequest(request)
   }
@@ -40,7 +46,7 @@ public actor APIClient {
   public func response<ResponseBody: Decodable>(
     endpoint: VoidRequestBodyEndpoint<ResponseBody>
   ) async throws -> ResponseBody {
-    let url = url(for: endpoint.path)
+    let url = url(for: endpoint.path, queryItems: endpoint.queryItems)
     let request = request(url: url, method: endpoint.method)
     let data = try await performRequest(request)
     return try decoder.decode(ResponseBody.self, from: data)
@@ -50,7 +56,7 @@ public actor APIClient {
     endpoint: Endpoint<RequestBody, ResponseBody>,
     requestBody: RequestBody
   ) async throws -> ResponseBody {
-    let url = url(for: endpoint.path)
+    let url = url(for: endpoint.path, queryItems: endpoint.queryItems)
     let request = try request(url: url, method: endpoint.method, body: requestBody)
     let data = try await performRequest(request)
     return try decoder.decode(ResponseBody.self, from: data)
@@ -98,7 +104,16 @@ public actor APIClient {
     return request
   }
 
-  private func url(for path: String) -> URL {
-    baseURL.appending(path: path)
+  private func url(for path: String, queryItems: [String: String]) -> URL {
+    let url = baseURL.appending(path: path)
+    guard !queryItems.isEmpty,
+          var components = URLComponents(url: url, resolvingAgainstBaseURL: false) else {
+      return url
+    }
+
+    components.queryItems = queryItems.map { name, value in
+      URLQueryItem(name: name, value: value)
+    }
+    return components.url ?? url
   }
 }
