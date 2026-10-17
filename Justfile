@@ -1,7 +1,7 @@
 # Bare `just` lists recipes.
 set default-list := true
 
-# SwiftFormat and SwiftLint autocorrect.
+# Apply SwiftFormat and SwiftLint autocorrects.
 lint:
-	swiftformat .
-	swiftlint lint --fix
+    swiftformat .
+    swiftlint lint --fix .

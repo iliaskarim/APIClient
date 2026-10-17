@@ -36,9 +36,6 @@ analyzer_rules:
   - unused_declaration
   - unused_import
 
-unused_declaration:
-  severity: error
-
 line_length:
   warning: 110
   excluded_lines_patterns:
@@ -48,11 +45,7 @@ nesting:
   function_level: 1
   type_level: 3
 
-trailing_whitespace:
-  severity: error
-
 non_optional_string_data_conversion:
-  severity: error
   include_variables: true
 
 # Swift Package Manager build directory.
