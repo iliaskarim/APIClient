@@ -154,7 +154,7 @@ func responseSendsTheEncodedBodyAndAcceptsAnEmptyResponse() async throws {
 
   let request = try #require(fixture.requests.first)
   let (components, items) = try request.componentsAndQueryItems()
-  let decoded = try decoder.decode([Measurement].self, from: #require(request.httpBody))
+  let encoded = try decoder.decode([Measurement].self, from: #require(request.httpBody))
 
   #expect(request.httpMethod == "POST")
   #expect(request.value(forHTTPHeaderField: "Accept") == "application/json")
@@ -164,10 +164,10 @@ func responseSendsTheEncodedBodyAndAcceptsAnEmptyResponse() async throws {
   #expect(components.host == "api.openweathermap.org")
   #expect(components.path == "/data/3.0/measurements")
   #expect(items == ["appid": "YOUR_API_KEY"])
-  #expect(decoded.count == 1)
-  #expect(decoded.first?.stationId == measurement.stationId)
-  #expect(decoded.first?.dt == measurement.dt)
-  #expect(decoded.first?.temperature == measurement.temperature)
+  #expect(encoded.count == 1)
+  #expect(encoded.first?.stationId == measurement.stationId)
+  #expect(encoded.first?.dt == measurement.dt)
+  #expect(encoded.first?.temperature == measurement.temperature)
 }
 
 /// POST /stations. Encoded request body, decoded response.
