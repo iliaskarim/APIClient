@@ -29,6 +29,7 @@ private extension URLRequest {
   }
 }
 
+/// DELETE /stations/{id}. No request body, empty response.
 @Test
 func responseSendsNoBodyAndAcceptsAnEmptyResponse() async throws {
   let fixture = Fixture(statusCode: 204)
@@ -61,6 +62,7 @@ func responseSendsNoBodyAndAcceptsAnEmptyResponse() async throws {
   #expect(items == ["appid": "YOUR_API_KEY"])
 }
 
+/// GET /stations. No request body, decoded response.
 @Test
 func responseSendsNoBodyAndDecodesTheResponse() async throws {
   let body = Data(
@@ -117,6 +119,7 @@ func responseSendsNoBodyAndDecodesTheResponse() async throws {
   #expect(decoded.first?.altitude == 150)
 }
 
+/// POST /measurements. Encoded request body, empty response.
 @Test
 func responseSendsTheEncodedBodyAndAcceptsAnEmptyResponse() async throws {
   let fixture = Fixture(statusCode: 204)
@@ -167,6 +170,7 @@ func responseSendsTheEncodedBodyAndAcceptsAnEmptyResponse() async throws {
   #expect(decoded.first?.temperature == measurement.temperature)
 }
 
+/// POST /stations. Encoded request body, decoded response.
 @Test
 func responseSendsTheEncodedBodyAndDecodesTheResponse() async throws {
   let body = Data(
