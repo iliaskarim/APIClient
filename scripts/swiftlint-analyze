@@ -1,0 +1,612 @@
+#!/usr/bin/env bash
+# Clean-build an Xcode scheme and run SwiftLint analyzer rules.
+#
+# Analyzer rules (`unused_import`, `unused_declaration`) need a real
+# xcodebuild compiler log. `swiftlint lint` does not run them.
+#
+# Copy this script to scripts/ in any project repo. When --scheme and
+# paths are omitted it uses the shared scheme named after the Xcode
+# project (extra Swift package schemes are skipped). A Swift package
+# with no shared scheme uses the package name from Package.swift.
+# Paths are every top-level directory (or root Swift file, other than
+# the package manifest) that contains Swift sources. A package that
+# supports macOS and has no Xcode project builds for platform=macOS;
+# otherwise the destination is an iPhone simulator. Override those
+# defaults per run; do not edit the script.
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+cd "$ROOT"
+
+SCHEME=""
+DEFAULT_DESTINATION="platform=iOS Simulator,name=iPhone 17"
+DESTINATION=""
+DESTINATION_SET=0
+CONFIG=".swiftlint.yml"
+DEFAULT_LOG="build/xcodebuild.log"
+COMPILER_LOG=""
+USE_XCODE_LOG=0
+DRY_RUN=0
+WORKSPACE=""
+XCODEPROJ=""
+DERIVED_DATA_NAME=""
+OTHER_SCHEMES=""
+PATHS=()
+EXTRA_XCODE_ARGS=()
+
+usage() {
+  cat <<'EOF'
+Usage:
+  swiftlint-analyze [options] [PATH...]
+
+Runs `xcodebuild clean build-for-testing` (so the log has compiler
+invocations) and then `swiftlint analyze` on the selected paths.
+
+Must be run on a Mac with Xcode and `swiftlint` on PATH.
+
+Do not analyze a failed or incremental test build. A Run-only or cached
+`build-for-testing` can print ** TEST BUILD SUCCEEDED ** while skipping
+Swift compile, so analyze reports `0 files` (or Could not read compiler
+invocations). `clean` forces every Swift file into the log, including
+test-only helpers.
+
+Defaults (override with flags; safe to reuse this script across repos):
+  scheme      The shared scheme with the same name as its .xcodeproj
+              or .xcworkspace. Extra package schemes (such as a local
+              Swift package) are skipped. A package checkout with no
+              shared scheme uses the name in Package.swift. Pass
+              --scheme when more than one project scheme remains.
+  paths       Top-level directories that contain Swift sources, plus
+              any Swift files that sit in the repo root (Package.swift
+              is omitted). PATH... and --path replace that list.
+  destination platform=macOS for a Swift package that supports macOS
+              and has no Xcode project. Otherwise
+              platform=iOS Simulator,name=iPhone 17.
+  Xcode log   DerivedData folder for the .xcodeproj, .xcworkspace, or
+              package that owns the scheme.
+
+Options:
+  --compiler-log-path PATH  Skip xcodebuild; analyze this log
+                            (build/xcodebuild.log or an .xcactivitylog)
+  --xcode-log               Skip xcodebuild; use the newest DerivedData
+                            build activity log for this project
+  --destination DEST        xcodebuild -destination
+  --scheme NAME             xcodebuild -scheme
+  --workspace PATH          xcodebuild -workspace
+  --xcodeproj PATH          xcodebuild -project
+  --derived-data-name NAME  DerivedData folder prefix for --xcode-log
+                            (default: project, workspace, or package
+                            that owns the scheme)
+  --config PATH             SwiftLint config (default: .swiftlint.yml)
+  --path PATH               Directory or file to analyze (repeatable)
+  --dry-run                 Print the xcodebuild / analyze commands
+  --                        Extra xcodebuild arguments, inserted before
+                            clean build-for-testing
+  -h, --help                Show this help
+
+Examples:
+  bash scripts/swiftlint-analyze
+  bash scripts/swiftlint-analyze --scheme MyApp --path MyApp --path MyAppTests
+  bash scripts/swiftlint-analyze --destination 'platform=macOS'
+  bash scripts/swiftlint-analyze --xcode-log
+  bash scripts/swiftlint-analyze --compiler-log-path build/xcodebuild.log
+  bash scripts/swiftlint-analyze -- CODE_SIGNING_ALLOWED=NO
+EOF
+}
+
+die() {
+  echo "error: $*" >&2
+  exit 1
+}
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --compiler-log-path)
+      COMPILER_LOG="${2:-}"
+      [[ -n "$COMPILER_LOG" ]] || die "--compiler-log-path requires a value"
+      shift 2
+      ;;
+    --xcode-log)
+      USE_XCODE_LOG=1
+      shift
+      ;;
+    --destination)
+      DESTINATION="${2:-}"
+      [[ -n "$DESTINATION" ]] || die "--destination requires a value"
+      DESTINATION_SET=1
+      shift 2
+      ;;
+    --scheme)
+      SCHEME="${2:-}"
+      [[ -n "$SCHEME" ]] || die "--scheme requires a value"
+      shift 2
+      ;;
+    --workspace)
+      WORKSPACE="${2:-}"
+      [[ -n "$WORKSPACE" ]] || die "--workspace requires a value"
+      shift 2
+      ;;
+    --xcodeproj)
+      XCODEPROJ="${2:-}"
+      [[ -n "$XCODEPROJ" ]] || die "--xcodeproj requires a value"
+      shift 2
+      ;;
+    --derived-data-name)
+      DERIVED_DATA_NAME="${2:-}"
+      [[ -n "$DERIVED_DATA_NAME" ]] || die "--derived-data-name requires a value"
+      shift 2
+      ;;
+    --config)
+      CONFIG="${2:-}"
+      [[ -n "$CONFIG" ]] || die "--config requires a value"
+      shift 2
+      ;;
+    --path)
+      [[ -n "${2:-}" ]] || die "--path requires a value"
+      PATHS+=("$2")
+      shift 2
+      ;;
+    --dry-run)
+      DRY_RUN=1
+      shift
+      ;;
+    --)
+      shift
+      EXTRA_XCODE_ARGS+=("$@")
+      break
+      ;;
+    -h | --help)
+      usage
+      exit 0
+      ;;
+    -*)
+      echo "Unknown argument: $1" >&2
+      usage >&2
+      exit 2
+      ;;
+    *)
+      PATHS+=("$1")
+      shift
+      ;;
+  esac
+done
+
+if [[ "$USE_XCODE_LOG" -eq 1 && -n "$COMPILER_LOG" ]]; then
+  die "--xcode-log cannot be combined with --compiler-log-path"
+fi
+
+if [[ -n "$WORKSPACE" && -n "$XCODEPROJ" ]]; then
+  die "--workspace cannot be combined with --xcodeproj"
+fi
+
+# Shared schemes only. User-specific schemes under xcuserdata are ignored
+# so a checkout behaves the same on every machine. Lines are "name<TAB>path".
+discover_scheme_files() {
+  find "$ROOT" \
+    -path '*/xcshareddata/xcschemes/*.xcscheme' \
+    -not -path '*/xcuserdata/*' \
+    -not -path '*/.git/*' \
+    -not -path '*/.build/*' \
+    -not -path '*/build/*' \
+    -not -path '*/DerivedData/*' \
+    -not -path '*/SourcePackages/*' \
+    -not -path '*/checkouts/*' \
+    -not -path '*/Checkouts/*' \
+    -not -path '*/Pods/*' \
+    -not -path '*/Carthage/*' \
+    -print \
+    | sort \
+    | while IFS= read -r path; do
+        [[ -n "$path" ]] || continue
+        printf '%s\t%s\n' "$(basename "$path" .xcscheme)" "$path"
+      done
+}
+
+discover_schemes() {
+  discover_scheme_files | awk -F '\t' 'NF { print $1 }' | sort -u
+}
+
+# .xcodeproj / .xcworkspace that contains this scheme file.
+# A scheme stored under Package/.swiftpm uses the package directory name.
+scheme_container() {
+  local dir base
+  dir="$(dirname "$1")"
+  while [[ -n "$dir" && "$dir" != "/" && "$dir" != "." ]]; do
+    base="$(basename "$dir")"
+    case "$base" in
+      *.xcodeproj)
+        printf '%s\n' "${base%.xcodeproj}"
+        return 0
+        ;;
+      *.xcworkspace)
+        printf '%s\n' "${base%.xcworkspace}"
+        return 0
+        ;;
+      .swiftpm)
+        basename "$(dirname "$dir")"
+        return 0
+        ;;
+    esac
+    dir="$(dirname "$dir")"
+  done
+}
+
+discover_project_name() {
+  local scheme="$1"
+  local name="" path="" fallback=""
+  while IFS=$'\t' read -r name path; do
+    [[ "$name" == "$scheme" && -n "$path" ]] || continue
+    if [[ "$path" != *"/.swiftpm/"* ]]; then
+      scheme_container "$path"
+      return 0
+    fi
+    if [[ -z "$fallback" ]]; then
+      fallback="$(scheme_container "$path")"
+    fi
+  done < <(discover_scheme_files)
+  if [[ -n "$fallback" ]]; then
+    printf '%s\n' "$fallback"
+  fi
+}
+
+# An .xcodeproj or .xcworkspace checked into the repo. The package
+# workspace Xcode writes under .swiftpm is not one of these.
+has_xcode_project() {
+  local found
+  found="$(
+    find "$ROOT" \( -name '*.xcodeproj' -o -name '*.xcworkspace' \) \
+      -not -path '*/.git/*' \
+      -not -path '*/.swiftpm/*' \
+      -not -path '*/.build/*' \
+      -not -path '*/build/*' \
+      -not -path '*/DerivedData/*' \
+      -not -path '*/SourcePackages/*' \
+      -not -path '*/checkouts/*' \
+      -not -path '*/Checkouts/*' \
+      -not -path '*/Pods/*' \
+      -not -path '*/Carthage/*' \
+      -print -quit
+  )"
+  [[ -n "$found" ]]
+}
+
+# Name field of Package.swift. `swift package dump-package` is authoritative;
+# the first name: string is the fallback when that command is unavailable.
+package_name() {
+  local name=""
+  if [[ -f Package.swift ]] && command -v swift >/dev/null 2>&1 && command -v python3 >/dev/null 2>&1; then
+    name="$(
+      swift package dump-package 2>/dev/null \
+        | python3 -c 'import json,sys; print(json.load(sys.stdin).get("name",""))' \
+        2>/dev/null || true
+    )"
+  fi
+  if [[ -z "$name" && -f Package.swift ]]; then
+    name="$(sed -n 's/^[[:space:]]*name:[[:space:]]*"\([^"]*\)".*/\1/p' Package.swift | head -1)"
+  fi
+  printf '%s\n' "$name"
+}
+
+package_supports_macos() {
+  [[ -f Package.swift ]] || return 1
+  if grep -Eq '\.macOS[[:space:]]*\(' Package.swift; then
+    return 0
+  fi
+  # No platforms list: SwiftPM can still build the package on the host Mac.
+  if ! grep -Eq 'platforms:[[:space:]]*\[' Package.swift; then
+    return 0
+  fi
+  return 1
+}
+
+default_destination() {
+  if [[ -f Package.swift ]] && ! has_xcode_project && package_supports_macos; then
+    printf '%s\n' 'platform=macOS'
+    return
+  fi
+  printf '%s\n' "$DEFAULT_DESTINATION"
+}
+
+# Pick one scheme when the repo has several. Prefer a scheme checked in
+# with the app/project over Xcode's generated Swift package scheme, then
+# the scheme whose name matches that project, then the project closest
+# to the repo root. Prints nothing when the choice is still ambiguous.
+select_default_scheme() {
+  local records name path container depth min="" chosen=""
+  records="$(discover_scheme_files)"
+  [[ -n "$records" ]] || return 0
+
+  if printf '%s\n' "$records" | awk -F '\t' 'index($2, "/.swiftpm/") == 0 { found = 1 } END { exit !found }'; then
+    records="$(printf '%s\n' "$records" | awk -F '\t' 'index($2, "/.swiftpm/") == 0')"
+  fi
+
+  chosen=""
+  while IFS=$'\t' read -r name path; do
+    [[ -n "$name" && -n "$path" ]] || continue
+    container="$(scheme_container "$path")"
+    if [[ -n "$container" && "$container" == "$name" ]]; then
+      chosen+="${name}"$'\t'"${path}"$'\n'
+    fi
+  done <<< "$records"
+  if [[ -n "$chosen" ]]; then
+    records="$chosen"
+  fi
+
+  min=""
+  while IFS=$'\t' read -r name path; do
+    [[ -n "$path" ]] || continue
+    depth="${path//[^\/]/}"
+    depth="${#depth}"
+    if [[ -z "$min" || "$depth" -lt "$min" ]]; then
+      min="$depth"
+    fi
+  done <<< "$records"
+
+  chosen=""
+  while IFS=$'\t' read -r name path; do
+    [[ -n "$path" ]] || continue
+    depth="${path//[^\/]/}"
+    depth="${#depth}"
+    if [[ "$depth" -eq "$min" ]]; then
+      chosen+="${name}"$'\n'
+    fi
+  done <<< "$records"
+
+  chosen="$(printf '%s\n' "$chosen" | sed '/^$/d' | sort -u)"
+  if [[ "$(printf '%s\n' "$chosen" | sed '/^$/d' | wc -l | tr -d '[:space:]')" -eq 1 ]]; then
+    printf '%s\n' "$chosen"
+  fi
+}
+
+# First path component of each Swift file, skipping dependency checkouts
+# and build products. A Swift file in the repo root is kept as itself.
+# Package.swift is a manifest, not a compiled source.
+discover_swift_paths() {
+  find . -name '*.swift' -type f \
+    -not -path './.git/*' \
+    -not -path './.build/*' \
+    -not -path './build/*' \
+    -not -path './Packages/*' \
+    -not -path './DerivedData/*' \
+    -not -path './Pods/*' \
+    -not -path './Carthage/*' \
+    -not -path './vendor/*' \
+    -not -path '*/.xcodeproj/*' \
+    -not -path '*/.xcworkspace/*' \
+    -not -path '*/xcuserdata/*' \
+    -not -path '*/.swiftpm/*' \
+    -not -path '*/SourcePackages/*' \
+    -not -path '*/checkouts/*' \
+    -not -path '*/Checkouts/*' \
+    | sed 's|^\./||' \
+    | awk -F/ '
+        $1 ~ /^\./ { next }
+        $0 == "Package.swift" { next }
+        $0 ~ /^Package@swift-.*\.swift$/ { next }
+        {
+          if (NF <= 1) print $0
+          else print $1
+        }
+      ' \
+    | sort -u
+}
+
+resolve_scheme() {
+  local required="$1"
+  local have chosen
+  have="$(discover_schemes || true)"
+  if [[ -n "$SCHEME" ]]; then
+    if [[ -z "$have" ]]; then
+      return 0
+    fi
+    if printf '%s\n' "$have" | grep -Fxq -- "$SCHEME"; then
+      return 0
+    fi
+    die "shared scheme not found: $SCHEME (have: $(printf '%s\n' "$have" | scheme_list))"
+  fi
+
+  chosen="$(select_default_scheme || true)"
+  if [[ -z "$chosen" && -z "$have" && -f Package.swift ]]; then
+    chosen="$(package_name || true)"
+  fi
+  if [[ -n "$chosen" ]]; then
+    SCHEME="$chosen"
+    if [[ -n "$have" ]]; then
+      OTHER_SCHEMES="$(printf '%s\n' "$have" | grep -Fxv -- "$SCHEME" | scheme_list || true)"
+    fi
+    return 0
+  fi
+  if [[ "$required" -eq 0 ]]; then
+    return 0
+  fi
+  if [[ -z "$have" ]]; then
+    if [[ -f Package.swift ]]; then
+      die "could not read the Swift package name; pass --scheme"
+    fi
+    die "no shared Xcode scheme found; pass --scheme"
+  fi
+  die "multiple shared schemes; pass --scheme ($(printf '%s\n' "$have" | scheme_list))"
+}
+
+scheme_list() {
+  awk 'NF { if (n++) printf ", "; printf "%s", $0 }'
+}
+
+latest_xcode_log() {
+  local project="$1"
+  local root="$HOME/Library/Developer/Xcode/DerivedData"
+  [[ -d "$root" ]] || return 0
+  # Newest *.xcactivitylog under DerivedData/${project}-*/Logs/Build/.
+  # stat -c is GNU; stat -f is the macOS equivalent.
+  find "$root" -mindepth 4 -maxdepth 4 -type f -name '*.xcactivitylog' \
+    -path "${root}/${project}-*/Logs/Build/*.xcactivitylog" -print \
+    | while IFS= read -r log; do
+        mtime="$(stat -c %Y "$log" 2>/dev/null || stat -f %m "$log" 2>/dev/null || true)"
+        [[ -n "$mtime" ]] || continue
+        printf '%s\t%s\n' "$mtime" "$log"
+      done \
+    | sort -nr \
+    | awk -F '\t' 'NR == 1 { print substr($0, index($0, "\t") + 1); exit }'
+}
+
+# Run xcodebuild, tee full output to a log, and on failure print the real
+# compiler/linker diagnostics (not just the "following build commands failed" footer).
+run_xcodebuild() {
+  local log_path="$1"
+  shift
+  set -o pipefail
+  if ! xcodebuild "$@" 2>&1 | tee "$log_path"; then
+    echo >&2
+    echo "error: xcodebuild failed — diagnostics from ${log_path}:" >&2
+    if ! grep -E '(^|:) error:|fatal error:' "$log_path" >&2; then
+      echo "(no 'error:' lines found; see full log: ${log_path})" >&2
+      tail -n 80 "$log_path" >&2 || true
+    fi
+    echo "Full log: ${log_path}" >&2
+    exit 1
+  fi
+}
+
+print_or_run() {
+  if [[ "$DRY_RUN" -eq 1 ]]; then
+    local first="$1"
+    shift
+    printf '%s' "$first"
+    local arg
+    for arg in "$@"; do
+      if [[ "$arg" == *[[:space:]\']* ]]; then
+        printf " '%s'" "${arg//\'/\'\\\'\'}"
+      else
+        printf ' %s' "$arg"
+      fi
+    done
+    printf '\n'
+    return 0
+  fi
+  "$@"
+}
+
+if [[ "$DESTINATION_SET" -eq 0 ]]; then
+  DESTINATION="$(default_destination)"
+fi
+
+SKIP_BUILD=0
+if [[ -n "$COMPILER_LOG" || "$USE_XCODE_LOG" -eq 1 ]]; then
+  SKIP_BUILD=1
+fi
+
+need_scheme=0
+if [[ "$SKIP_BUILD" -eq 0 ]]; then
+  need_scheme=1
+elif [[ "$USE_XCODE_LOG" -eq 1 && -z "$DERIVED_DATA_NAME" && -z "$XCODEPROJ" ]]; then
+  need_scheme=1
+fi
+resolve_scheme "$need_scheme"
+
+if [[ ${#PATHS[@]} -eq 0 ]]; then
+  while IFS= read -r discovered; do
+    [[ -n "$discovered" ]] || continue
+    PATHS+=("$discovered")
+  done < <(discover_swift_paths)
+fi
+if [[ ${#PATHS[@]} -eq 0 ]]; then
+  die "no Swift paths to analyze; pass --path or PATH"
+fi
+
+if [[ "$USE_XCODE_LOG" -eq 1 ]]; then
+  project="$DERIVED_DATA_NAME"
+  if [[ -z "$project" && -n "$XCODEPROJ" ]]; then
+    project="$(basename "$XCODEPROJ" .xcodeproj)"
+  fi
+  if [[ -z "$project" && -n "$SCHEME" ]]; then
+    project="$(discover_project_name "$SCHEME" || true)"
+    [[ -n "$project" ]] || project="$SCHEME"
+  fi
+  [[ -n "$project" ]] || die "pass --scheme or --derived-data-name to locate the Xcode log"
+  COMPILER_LOG="$(latest_xcode_log "$project" || true)"
+  if [[ -z "$COMPILER_LOG" ]]; then
+    if [[ "$DRY_RUN" -eq 1 ]]; then
+      COMPILER_LOG="\$HOME/Library/Developer/Xcode/DerivedData/${project}-*/Logs/Build/*.xcactivitylog"
+    else
+      die "no ${project} .xcactivitylog under DerivedData"
+    fi
+  fi
+fi
+
+if [[ "$SKIP_BUILD" -eq 0 ]]; then
+  COMPILER_LOG="$DEFAULT_LOG"
+fi
+
+if [[ "$SKIP_BUILD" -eq 1 && "$DRY_RUN" -eq 0 && ! -f "$COMPILER_LOG" ]]; then
+  die "compiler log not found: $COMPILER_LOG"
+fi
+
+if [[ "$DRY_RUN" -eq 0 ]]; then
+  if [[ "$(uname -s)" != "Darwin" ]]; then
+    die "this script must run on macOS with Xcode"
+  fi
+  if [[ "$SKIP_BUILD" -eq 0 ]]; then
+    command -v xcodebuild >/dev/null 2>&1 || die "xcodebuild not found (install Xcode)"
+    if [[ -n "$WORKSPACE" && ! -d "$WORKSPACE" ]]; then
+      die "workspace not found: $WORKSPACE"
+    fi
+    if [[ -n "$XCODEPROJ" && ! -d "$XCODEPROJ" ]]; then
+      die "xcodeproj not found: $XCODEPROJ"
+    fi
+  fi
+  command -v swiftlint >/dev/null 2>&1 || die "swiftlint not found (install SwiftLint)"
+  [[ -f "$CONFIG" ]] || die "missing $CONFIG"
+  for path in "${PATHS[@]}"; do
+    [[ -e "$path" ]] || die "path not found: $path"
+  done
+fi
+
+xcode_args=()
+if [[ -n "$WORKSPACE" ]]; then
+  xcode_args+=(-workspace "$WORKSPACE")
+elif [[ -n "$XCODEPROJ" ]]; then
+  xcode_args+=(-project "$XCODEPROJ")
+fi
+xcode_args+=(-scheme "$SCHEME" -destination "$DESTINATION")
+if [[ ${#EXTRA_XCODE_ARGS[@]} -gt 0 ]]; then
+  xcode_args+=("${EXTRA_XCODE_ARGS[@]}")
+fi
+xcode_args+=(clean build-for-testing)
+
+analyze_args=(
+  analyze
+  --config "$CONFIG"
+  --compiler-log-path "$COMPILER_LOG"
+)
+analyze_args+=("${PATHS[@]}")
+
+if [[ -n "$SCHEME" ]]; then
+  if [[ -n "$OTHER_SCHEMES" ]]; then
+    echo "Scheme: $SCHEME (other shared schemes: $OTHER_SCHEMES; pass --scheme to override)" >&2
+  else
+    echo "Scheme: $SCHEME" >&2
+  fi
+fi
+echo "Destination: $DESTINATION" >&2
+echo "Paths:" >&2
+printf '  %s\n' "${PATHS[@]}" >&2
+
+if [[ "$SKIP_BUILD" -eq 1 ]]; then
+  echo "Analyzing $COMPILER_LOG (skipped xcodebuild)" >&2
+  if [[ "$USE_XCODE_LOG" -eq 1 ]]; then
+    echo "An incremental Xcode activity log has the same empty-analyze problem; clean-build first so the log actually compiled Swift." >&2
+  fi
+  print_or_run swiftlint "${analyze_args[@]}"
+  exit 0
+fi
+
+echo "Building $SCHEME (clean build-for-testing) → $COMPILER_LOG" >&2
+if [[ "$DRY_RUN" -eq 1 ]]; then
+  print_or_run xcodebuild "${xcode_args[@]}"
+  print_or_run swiftlint "${analyze_args[@]}"
+  exit 0
+fi
+
+mkdir -p -- "$(dirname "$COMPILER_LOG")"
+run_xcodebuild "$COMPILER_LOG" "${xcode_args[@]}"
+print_or_run swiftlint "${analyze_args[@]}"

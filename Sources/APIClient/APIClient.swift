@@ -1,20 +1,26 @@
 import Foundation
 
-public actor APIClient {
-  public struct Endpoint<RequestBody, ResponseBody> {
-    let method: String
-    let path: String
+public struct Endpoint<RequestBody, ResponseBody> {
+  let method: String
+  let path: String
+  let queryItems: [String: String]
 
-    public init(path: String, method: String = "GET") {
-      self.path = path
-      self.method = method
-    }
+  public init(
+    path: String,
+    method: String = "GET",
+    queryItems: [String: String] = [:]
+  ) {
+    self.path = path
+    self.method = method
+    self.queryItems = queryItems
   }
+}
 
-  public typealias VoidBodyEndpoint = Endpoint<Void, Void>
-  public typealias VoidRequestBodyEndpoint<ResponseBody> = Endpoint<Void, ResponseBody>
-  public typealias VoidResponseBodyEndpoint<RequestBody> = Endpoint<RequestBody, Void>
+public typealias VoidBodyEndpoint = Endpoint<Void, Void>
+public typealias VoidRequestBodyEndpoint<ResponseBody> = Endpoint<Void, ResponseBody>
+public typealias VoidResponseBodyEndpoint<RequestBody> = Endpoint<RequestBody, Void>
 
+public actor APIClient {
   public var bearerToken: String?
 
   private let baseURL: URL
@@ -23,7 +29,7 @@ public actor APIClient {
   private let session: URLSession
 
   public func response(endpoint: VoidBodyEndpoint) async throws {
-    let url = url(for: endpoint.path)
+    let url = url(for: endpoint.path, queryItems: endpoint.queryItems)
     let request = request(url: url, method: endpoint.method)
     try await performRequest(request)
   }
@@ -32,7 +38,7 @@ public actor APIClient {
     endpoint: VoidResponseBodyEndpoint<RequestBody>,
     requestBody: RequestBody
   ) async throws {
-    let url = url(for: endpoint.path)
+    let url = url(for: endpoint.path, queryItems: endpoint.queryItems)
     let request = try request(url: url, method: endpoint.method, body: requestBody)
     try await performRequest(request)
   }
@@ -40,7 +46,7 @@ public actor APIClient {
   public func response<ResponseBody: Decodable>(
     endpoint: VoidRequestBodyEndpoint<ResponseBody>
   ) async throws -> ResponseBody {
-    let url = url(for: endpoint.path)
+    let url = url(for: endpoint.path, queryItems: endpoint.queryItems)
     let request = request(url: url, method: endpoint.method)
     let data = try await performRequest(request)
     return try decoder.decode(ResponseBody.self, from: data)
@@ -50,7 +56,7 @@ public actor APIClient {
     endpoint: Endpoint<RequestBody, ResponseBody>,
     requestBody: RequestBody
   ) async throws -> ResponseBody {
-    let url = url(for: endpoint.path)
+    let url = url(for: endpoint.path, queryItems: endpoint.queryItems)
     let request = try request(url: url, method: endpoint.method, body: requestBody)
     let data = try await performRequest(request)
     return try decoder.decode(ResponseBody.self, from: data)
@@ -77,6 +83,7 @@ public actor APIClient {
           (200 ..< 300).contains(httpResponse.statusCode) else {
       throw URLError(.badServerResponse)
     }
+
     return data
   }
 
@@ -90,14 +97,23 @@ public actor APIClient {
     return request
   }
 
-  private func request<Body: Encodable>(url: URL, method: String, body: Body) throws -> URLRequest {
+  private func request(url: URL, method: String, body: some Encodable) throws -> URLRequest {
     var request = request(url: url, method: method)
     request.setValue("application/json", forHTTPHeaderField: "Content-Type")
     request.httpBody = try encoder.encode(body)
     return request
   }
 
-  private func url(for path: String) -> URL {
-    baseURL.appending(path: path)
+  private func url(for path: String, queryItems: [String: String]) -> URL {
+    let url = baseURL.appending(path: path)
+    guard !queryItems.isEmpty,
+          var components = URLComponents(url: url, resolvingAgainstBaseURL: false) else {
+      return url
+    }
+
+    components.queryItems = queryItems.map { name, value in
+      URLQueryItem(name: name, value: value)
+    }
+    return components.url ?? url
   }
 }

@@ -51,7 +51,10 @@ let client = APIClient(
 
 ```swift
 let stations: [Station] = try await client.response(
-  endpoint: .init(path: "data/3.0/stations?appid=\(apiKey)")
+  endpoint: Endpoint(
+    path: "data/3.0/stations",
+    queryItems: ["appid": apiKey]
+  )
 )
 ```
 
@@ -61,7 +64,11 @@ let stations: [Station] = try await client.response(
 
 ```swift
 let created: Station = try await client.response(
-  endpoint: .init(path: "data/3.0/stations?appid=\(apiKey)", method: "POST"),
+  endpoint: Endpoint(
+    path: "data/3.0/stations",
+    method: "POST",
+    queryItems: ["appid": apiKey]
+  ),
   requestBody: Station(
     id: nil,
     externalId: "SF_TEST001",
@@ -79,7 +86,11 @@ let created: Station = try await client.response(
 
 ```swift
 try await client.response(
-  endpoint: .init(path: "data/3.0/measurements?appid=\(apiKey)", method: "POST"),
+  endpoint: Endpoint(
+    path: "data/3.0/measurements",
+    method: "POST",
+    queryItems: ["appid": apiKey]
+  ),
   requestBody: [
     Measurement(
       stationId: created.id!,
@@ -96,9 +107,10 @@ try await client.response(
 
 ```swift
 try await client.response(
-  endpoint: .init(
-    path: "data/3.0/stations/\(created.id!)?appid=\(apiKey)",
-    method: "DELETE"
+  endpoint: Endpoint(
+    path: "data/3.0/stations/\(created.id!)",
+    method: "DELETE",
+    queryItems: ["appid": apiKey]
   )
 )
 ```
