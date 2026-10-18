@@ -9,3 +9,7 @@ lint:
 # Run SwiftLint analyzer rules against a clean build log.
 analyze:
     bash scripts/swiftlint-analyze
+
+# Run unit tests with coverage and write an HTML report to coverage/.
+test:
+    bash scripts/coverage
