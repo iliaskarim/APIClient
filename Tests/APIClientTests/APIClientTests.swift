@@ -51,7 +51,8 @@ func responseSendsTheRequestAndDecodesTheBody() async throws {
   ]
 
   let decoded: CurrentWeather = try await client.response(
-    endpoint: .init(path: path, queryItems: queryItems)
+    endpoint: .init(path: path),
+    queryItems: queryItems
   )
 
   let request = try #require(fixture.requests.first)

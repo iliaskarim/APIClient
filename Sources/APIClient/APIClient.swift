@@ -3,16 +3,13 @@ import Foundation
 public struct Endpoint<RequestBody, ResponseBody> {
   let method: String
   let path: String
-  let queryItems: [String: String]
 
   public init(
     path: String,
-    method: String = "GET",
-    queryItems: [String: String] = [:]
+    method: String = "GET"
   ) {
     self.path = path
     self.method = method
-    self.queryItems = queryItems
   }
 }
 
@@ -28,25 +25,30 @@ public actor APIClient {
   private let encoder: JSONEncoder
   private let session: URLSession
 
-  public func response(endpoint: VoidBodyEndpoint) async throws {
-    let url = url(for: endpoint.path, queryItems: endpoint.queryItems)
+  public func response(
+    endpoint: VoidBodyEndpoint,
+    queryItems: [String: String] = [:]
+  ) async throws {
+    let url = url(for: endpoint.path, queryItems: queryItems)
     let request = request(url: url, method: endpoint.method)
     try await performRequest(request)
   }
 
   public func response<RequestBody: Encodable>(
     endpoint: VoidResponseBodyEndpoint<RequestBody>,
-    requestBody: RequestBody
+    requestBody: RequestBody,
+    queryItems: [String: String] = [:]
   ) async throws {
-    let url = url(for: endpoint.path, queryItems: endpoint.queryItems)
+    let url = url(for: endpoint.path, queryItems: queryItems)
     let request = try request(url: url, method: endpoint.method, body: requestBody)
     try await performRequest(request)
   }
 
   public func response<ResponseBody: Decodable>(
-    endpoint: VoidRequestBodyEndpoint<ResponseBody>
+    endpoint: VoidRequestBodyEndpoint<ResponseBody>,
+    queryItems: [String: String] = [:]
   ) async throws -> ResponseBody {
-    let url = url(for: endpoint.path, queryItems: endpoint.queryItems)
+    let url = url(for: endpoint.path, queryItems: queryItems)
     let request = request(url: url, method: endpoint.method)
     let data = try await performRequest(request)
     return try decoder.decode(ResponseBody.self, from: data)
@@ -54,9 +56,10 @@ public actor APIClient {
 
   public func response<RequestBody: Encodable, ResponseBody: Decodable>(
     endpoint: Endpoint<RequestBody, ResponseBody>,
-    requestBody: RequestBody
+    requestBody: RequestBody,
+    queryItems: [String: String] = [:]
   ) async throws -> ResponseBody {
-    let url = url(for: endpoint.path, queryItems: endpoint.queryItems)
+    let url = url(for: endpoint.path, queryItems: queryItems)
     let request = try request(url: url, method: endpoint.method, body: requestBody)
     let data = try await performRequest(request)
     return try decoder.decode(ResponseBody.self, from: data)
