@@ -1,6 +1,6 @@
 # APIClient
 
-Bare-bones async JSON client. `Endpoint` is a path, an HTTP method, and a query-parameter dictionary. Call `response` to send it.
+Bare-bones async JSON client. `Endpoint` is a path and an HTTP method. Pass query items into `response` the same way you pass a request body.
 
 ## Installation
 
@@ -51,10 +51,8 @@ let client = APIClient(
 
 ```swift
 let stations: [Station] = try await client.response(
-  endpoint: Endpoint(
-    path: "data/3.0/stations",
-    queryItems: ["appid": apiKey]
-  )
+  endpoint: Endpoint(path: "data/3.0/stations"),
+  queryItems: ["appid": apiKey]
 )
 ```
 
@@ -64,11 +62,7 @@ let stations: [Station] = try await client.response(
 
 ```swift
 let created: Station = try await client.response(
-  endpoint: Endpoint(
-    path: "data/3.0/stations",
-    method: "POST",
-    queryItems: ["appid": apiKey]
-  ),
+  endpoint: Endpoint(path: "data/3.0/stations", method: "POST"),
   requestBody: Station(
     id: nil,
     externalId: "SF_TEST001",
@@ -76,7 +70,8 @@ let created: Station = try await client.response(
     latitude: 37.76,
     longitude: -122.43,
     altitude: 150
-  )
+  ),
+  queryItems: ["appid": apiKey]
 )
 ```
 
@@ -86,18 +81,15 @@ let created: Station = try await client.response(
 
 ```swift
 try await client.response(
-  endpoint: Endpoint(
-    path: "data/3.0/measurements",
-    method: "POST",
-    queryItems: ["appid": apiKey]
-  ),
+  endpoint: Endpoint(path: "data/3.0/measurements", method: "POST"),
   requestBody: [
     Measurement(
       stationId: created.id!,
       dt: Date(timeIntervalSince1970: 1479817340),
       temperature: 18.7
     )
-  ]
+  ],
+  queryItems: ["appid": apiKey]
 )
 ```
 
@@ -109,8 +101,8 @@ try await client.response(
 try await client.response(
   endpoint: Endpoint(
     path: "data/3.0/stations/\(created.id!)",
-    method: "DELETE",
-    queryItems: ["appid": apiKey]
-  )
+    method: "DELETE"
+  ),
+  queryItems: ["appid": apiKey]
 )
 ```
