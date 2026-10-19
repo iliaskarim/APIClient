@@ -45,7 +45,8 @@ func responseSendsNoBodyAndAcceptsAnEmptyResponse() async throws {
   let queryItems = ["appid": apiKey]
 
   try await client.response(
-    endpoint: .init(path: path, method: "DELETE", queryItems: queryItems)
+    endpoint: .init(path: path, method: "DELETE"),
+    queryItems: queryItems
   )
 
   let request = try #require(fixture.requests.first)
@@ -95,7 +96,8 @@ func responseSendsNoBodyAndDecodesTheResponse() async throws {
   let queryItems = ["appid": apiKey]
 
   let decoded: [Station] = try await client.response(
-    endpoint: .init(path: path, queryItems: queryItems)
+    endpoint: .init(path: path),
+    queryItems: queryItems
   )
 
   let request = try #require(fixture.requests.first)
@@ -148,8 +150,9 @@ func responseSendsTheEncodedBodyAndAcceptsAnEmptyResponse() async throws {
   )
 
   try await client.response(
-    endpoint: .init(path: path, method: "POST", queryItems: queryItems),
-    requestBody: [measurement]
+    endpoint: .init(path: path, method: "POST"),
+    requestBody: [measurement],
+    queryItems: queryItems
   )
 
   let request = try #require(fixture.requests.first)
@@ -212,8 +215,9 @@ func responseSendsTheEncodedBodyAndDecodesTheResponse() async throws {
   )
 
   let decoded: Station = try await client.response(
-    endpoint: .init(path: path, method: "POST", queryItems: queryItems),
-    requestBody: station
+    endpoint: .init(path: path, method: "POST"),
+    requestBody: station,
+    queryItems: queryItems
   )
 
   let request = try #require(fixture.requests.first)
