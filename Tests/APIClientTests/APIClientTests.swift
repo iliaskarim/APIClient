@@ -31,20 +31,9 @@ private extension URLRequest {
 
 @Suite(.serialized)
 struct APIClientTests {
-  private static let stationsResponseBody = Data(
-    """
-    [
-      {
-        "id": "station-1",
-        "external_id": "SF_TEST001",
-        "name": "San Francisco Test Station",
-        "latitude": 37.76,
-        "longitude": -122.43,
-        "altitude": 150
-      }
-    ]
-    """.utf8
-  )
+  private static let fixture = Fixture()
+
+  private static let session = fixture.makeSession()
 
   private static let stationResponseBody = Data(
     """
@@ -59,8 +48,20 @@ struct APIClientTests {
     """.utf8
   )
 
-  private static let fixture = Fixture()
-  private static let session = fixture.makeSession()
+  private static let stationsResponseBody = Data(
+    """
+    [
+      {
+        "id": "station-1",
+        "external_id": "SF_TEST001",
+        "name": "San Francisco Test Station",
+        "latitude": 37.76,
+        "longitude": -122.43,
+        "altitude": 150
+      }
+    ]
+    """.utf8
+  )
 
   /// DELETE /stations/{id}. No request body, empty response.
   @Test
