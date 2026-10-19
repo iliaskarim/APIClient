@@ -1,32 +1,29 @@
 # How to Build a Bare-Bones Async JSON Client in Swift
 
-In this tutorial we will learn how to build a small async JSON API client in Swift and use it to fetch the current weather from OpenWeather. The client stays intentionally thin: an endpoint is a path, an HTTP method, and optional query items, and a single `response` call sends the request and decodes JSON. If you already followed [How to Retrieve the Current Weather Forecast from OpenWeather](/how-to-retrieve-the-current-weather-forecast-from-openweather), this post is the next step—wrapping that same endpoint in a reusable client instead of hand-rolling `URLSession` at every call site.
+In this tutorial we will learn how to build a small async JSON API client in Swift and use it to fetch the current weather from OpenWeather. The client stays intentionally thin: an endpoint is a path and an HTTP method, and a single `response` call sends the request and decodes JSON. If you already followed [How to Retrieve the Current Weather Forecast from OpenWeather](/how-to-retrieve-the-current-weather-forecast-from-openweather), this post is the next step—wrapping that same endpoint in a reusable client instead of hand-rolling `URLSession` at every call site.
 
 ## Getting Started
 
-Start with the value that describes *what* to call. An `Endpoint` carries an HTTP method, a path, and any query parameters. The two generic parameters record whether the call has a JSON request body and whether it expects a JSON response body. For a weather GET we only need the response side, so the request body type is `Void`:
+Start with the value that describes *what* to call. An `Endpoint` carries an HTTP method and a path—not the query string and not the request body. Those stay at the call site, the same way you already pass a body into `response` when you need one. The two generic parameters record whether the call has a JSON request body and whether it expects a JSON response body. For a weather GET we only need the response side, so the request body type is `Void`:
 
 ```swift
 struct Endpoint<RequestBody, ResponseBody> {
   let method: String
   let path: String
-  let queryItems: [String: String]
 
   init(
     path: String,
-    method: String = "GET",
-    queryItems: [String: String] = [:]
+    method: String = "GET"
   ) {
     self.path = path
     self.method = method
-    self.queryItems = queryItems
   }
 }
 
 typealias VoidRequestBodyEndpoint<ResponseBody> = Endpoint<Void, ResponseBody>
 ```
 
-Keep the path as the resource alone—for Current Weather that is `data/2.5/weather`. Parameters such as `appid`, `lat`, and `lon` belong in a `[String: String]` of `queryItems`, the same separate inputs you used in the [earlier OpenWeather post](/how-to-retrieve-the-current-weather-forecast-from-openweather). `Void` on the request body is only a marker, not something you encode. It lets the type system tell a “GET that returns JSON” apart from later shapes such as “POST that returns nothing,” without putting that distinction into the method name. OpenWeather’s Current Weather API only needs this GET shape, so we will implement one `response` overload and leave the others for APIs that actually accept bodies or return empty responses.
+Keep the path as the resource alone—for Current Weather that is `data/2.5/weather`. Parameters such as `appid`, `lat`, and `lon` belong in a `[String: String]` of `queryItems` passed into `response`, the same separate inputs you used in the [earlier OpenWeather post](/how-to-retrieve-the-current-weather-forecast-from-openweather). `Void` on the request body is only a marker, not something you encode. It lets the type system tell a “GET that returns JSON” apart from later shapes such as “POST that returns nothing,” without putting that distinction into the method name. OpenWeather’s Current Weather API only needs this GET shape, so we will implement one `response` overload and leave the others for APIs that actually accept bodies or return empty responses.
 
 ## Why an Actor?
 
@@ -121,14 +118,15 @@ let queryItems = [
 
 ## Decoding the Response
 
-The GET overload takes a void-request endpoint, performs the request, and decodes the body. The return type is inferred from the call site, so you read `CurrentWeather` (or any other `Decodable`) without casting:
+The GET overload takes a void-request endpoint plus optional `queryItems`, performs the request, and decodes the body. The return type is inferred from the call site, so you read `CurrentWeather` (or any other `Decodable`) without casting:
 
 ```swift
 extension APIClient {
   func response<ResponseBody: Decodable>(
-    endpoint: VoidRequestBodyEndpoint<ResponseBody>
+    endpoint: VoidRequestBodyEndpoint<ResponseBody>,
+    queryItems: [String: String] = [:]
   ) async throws -> ResponseBody {
-    let url = url(for: endpoint.path, queryItems: endpoint.queryItems)
+    let url = url(for: endpoint.path, queryItems: queryItems)
     let request = request(url: url, method: endpoint.method)
     let data = try await performRequest(request)
     return try decoder.decode(ResponseBody.self, from: data)
@@ -160,11 +158,12 @@ struct CurrentWeather: Decodable {
 
 ## Putting It Together
 
-With the client and model in place, the call site is one `await`. Create the endpoint inline, or store it next to the screen that loads forecast data:
+With the client and model in place, the call site is one `await`. Create the endpoint inline, or store it next to the screen that loads forecast data, and pass the query dictionary into `response`:
 
 ```swift
 let forecast: CurrentWeather = try await client.response(
-  endpoint: .init(path: path, queryItems: queryItems)
+  endpoint: .init(path: path),
+  queryItems: queryItems
 )
 
 let condition = forecast.weather.first?.description ?? "Unknown"
@@ -175,6 +174,6 @@ That is the whole GET path: describe the endpoint, share an actor-isolated clien
 
 ## Conclusion
 
-We’ve built a bare-bones async JSON client—an `Endpoint` for method, path, and query items, an `actor` so one instance can be shared safely from async call sites, and a `response` overload that GETs and decodes. Pointed at OpenWeather’s Current Weather API, that is enough to load Brooklyn’s forecast behind a single call site. From here you can grow the decoded model with more of the fields from the [earlier OpenWeather post](/how-to-retrieve-the-current-weather-forecast-from-openweather), add a 5-day endpoint with another path, or extend `response` for POST and DELETE when an API actually needs them.
+We’ve built a bare-bones async JSON client—an `Endpoint` for method and path, an `actor` so one instance can be shared safely from async call sites, and a `response` overload that takes optional query items, GETs, and decodes. Pointed at OpenWeather’s Current Weather API, that is enough to load Brooklyn’s forecast behind a single call site. From here you can grow the decoded model with more of the fields from the [earlier OpenWeather post](/how-to-retrieve-the-current-weather-forecast-from-openweather), add a 5-day endpoint with another path, or extend `response` for POST and DELETE when an API actually needs them.
 
 *Cover image generated for this post.*
