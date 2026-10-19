@@ -124,6 +124,7 @@ struct APIClientTests {
     let encoder = JSONEncoder()
     encoder.dateEncodingStrategy = .secondsSince1970
     encoder.keyEncodingStrategy = .convertToSnakeCase
+    encoder.outputFormatting = .sortedKeys
     let decoder = JSONDecoder()
     decoder.dateDecodingStrategy = .secondsSince1970
     decoder.keyDecodingStrategy = .convertFromSnakeCase
@@ -148,20 +149,17 @@ struct APIClientTests {
 
     let request = try #require(fixture.requests.first)
     let (components, items) = try request.componentsAndQueryItems()
-    let encoded = try decoder.decode([Measurement].self, from: #require(request.httpBody))
+    let encoded = try encoder.encode([measurement])
 
     #expect(request.httpMethod == "POST")
     #expect(request.value(forHTTPHeaderField: "Accept") == "application/json")
     #expect(request.value(forHTTPHeaderField: "Content-Type") == "application/json")
     #expect(request.value(forHTTPHeaderField: "Authorization") == nil)
+    #expect(request.httpBody == encoded)
     #expect(components.scheme == "https")
     #expect(components.host == "api.openweathermap.org")
     #expect(components.path == "/data/3.0/measurements")
     #expect(items == ["appid": "YOUR_API_KEY"])
-    #expect(encoded.count == 1)
-    #expect(encoded.first?.stationId == measurement.stationId)
-    #expect(encoded.first?.dt == measurement.dt)
-    #expect(encoded.first?.temperature == measurement.temperature)
   }
 
   /// POST /stations. Encoded request body, decoded response.
@@ -184,6 +182,7 @@ struct APIClientTests {
 
     let encoder = JSONEncoder()
     encoder.keyEncodingStrategy = .convertToSnakeCase
+    encoder.outputFormatting = .sortedKeys
     let decoder = JSONDecoder()
     decoder.keyDecodingStrategy = .convertFromSnakeCase
     let client = try APIClient(
@@ -210,22 +209,17 @@ struct APIClientTests {
 
     let request = try #require(fixture.requests.first)
     let (components, items) = try request.componentsAndQueryItems()
-    let encoded = try decoder.decode(Station.self, from: #require(request.httpBody))
+    let encoded = try encoder.encode(station)
 
     #expect(request.httpMethod == "POST")
     #expect(request.value(forHTTPHeaderField: "Accept") == "application/json")
     #expect(request.value(forHTTPHeaderField: "Content-Type") == "application/json")
     #expect(request.value(forHTTPHeaderField: "Authorization") == nil)
+    #expect(request.httpBody == encoded)
     #expect(components.scheme == "https")
     #expect(components.host == "api.openweathermap.org")
     #expect(components.path == "/data/3.0/stations")
     #expect(items == ["appid": "YOUR_API_KEY"])
-    #expect(encoded.id == station.id)
-    #expect(encoded.externalId == station.externalId)
-    #expect(encoded.name == station.name)
-    #expect(encoded.latitude == station.latitude)
-    #expect(encoded.longitude == station.longitude)
-    #expect(encoded.altitude == station.altitude)
     #expect(decoded.id == "station-1")
     #expect(decoded.externalId == station.externalId)
     #expect(decoded.name == station.name)
