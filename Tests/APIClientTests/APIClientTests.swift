@@ -3,6 +3,14 @@ import Foundation
 import Testing
 @testable import APIClient
 
+private struct AppIDQuery: QueryItemsConvertible {
+  let appid: String
+
+  var queryItems: [String: String] {
+    ["appid": appid]
+  }
+}
+
 private struct Measurement: Codable {
   let stationId: String
   let dt: Date
@@ -63,7 +71,7 @@ struct APIClientTests {
     """.utf8
   )
 
-  /// DELETE /stations/{id}. No request body, empty response.
+  /// DELETE /stations/{id}. No request body, empty response. Query items come from a custom type.
   @Test
   func responseSendsNoBodyAndAcceptsAnEmptyResponse() async throws {
     Self.fixture.setResponse(statusCode: 204)
@@ -75,7 +83,7 @@ struct APIClientTests {
 
     try await client.response(
       endpoint: .init(path: "data/3.0/stations/station-1", method: "DELETE"),
-      queryItems: ["appid": "API_KEY"]
+      queryItems: AppIDQuery(appid: "API_KEY")
     )
 
     let request = try #require(Self.fixture.requests.last)

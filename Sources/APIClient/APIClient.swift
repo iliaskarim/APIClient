@@ -1,6 +1,20 @@
 import Foundation
 
-public struct Endpoint<RequestBody, ResponseBody> {
+public protocol QueryItemsConvertible {
+  var queryItems: [String: String] { get }
+}
+
+extension [String: String]: QueryItemsConvertible {
+  public var queryItems: [String: String] {
+    self
+  }
+
+  public init(_ queryItems: some QueryItemsConvertible) {
+    self = queryItems.queryItems
+  }
+}
+
+public struct Endpoint<QueryItems, RequestBody, ResponseBody> {
   let method: String
   let path: String
 
@@ -13,9 +27,11 @@ public struct Endpoint<RequestBody, ResponseBody> {
   }
 }
 
-public typealias VoidBodyEndpoint = Endpoint<Void, Void>
-public typealias VoidRequestBodyEndpoint<ResponseBody> = Endpoint<Void, ResponseBody>
-public typealias VoidResponseBodyEndpoint<RequestBody> = Endpoint<RequestBody, Void>
+public typealias VoidBodyEndpoint<QueryItems> = Endpoint<QueryItems, Void, Void>
+public typealias VoidRequestBodyEndpoint<QueryItems, ResponseBody> =
+  Endpoint<QueryItems, Void, ResponseBody>
+public typealias VoidResponseBodyEndpoint<QueryItems, RequestBody> =
+  Endpoint<QueryItems, RequestBody, Void>
 
 public actor APIClient {
   public var bearerToken: String?
@@ -25,28 +41,28 @@ public actor APIClient {
   private let encoder: JSONEncoder
   private let session: URLSession
 
-  public func response(
-    endpoint: VoidBodyEndpoint,
-    queryItems: [String: String] = [:]
+  public func response<QueryItems: QueryItemsConvertible>(
+    endpoint: VoidBodyEndpoint<QueryItems>,
+    queryItems: QueryItems
   ) async throws {
     let url = url(for: endpoint.path, queryItems: queryItems)
     let request = request(url: url, method: endpoint.method)
     try await performRequest(request)
   }
 
-  public func response<RequestBody: Encodable>(
-    endpoint: VoidResponseBodyEndpoint<RequestBody>,
+  public func response<QueryItems: QueryItemsConvertible, RequestBody: Encodable>(
+    endpoint: VoidResponseBodyEndpoint<QueryItems, RequestBody>,
     requestBody: RequestBody,
-    queryItems: [String: String] = [:]
+    queryItems: QueryItems
   ) async throws {
     let url = url(for: endpoint.path, queryItems: queryItems)
     let request = try request(url: url, method: endpoint.method, body: requestBody)
     try await performRequest(request)
   }
 
-  public func response<ResponseBody: Decodable>(
-    endpoint: VoidRequestBodyEndpoint<ResponseBody>,
-    queryItems: [String: String] = [:]
+  public func response<QueryItems: QueryItemsConvertible, ResponseBody: Decodable>(
+    endpoint: VoidRequestBodyEndpoint<QueryItems, ResponseBody>,
+    queryItems: QueryItems
   ) async throws -> ResponseBody {
     let url = url(for: endpoint.path, queryItems: queryItems)
     let request = request(url: url, method: endpoint.method)
@@ -54,10 +70,14 @@ public actor APIClient {
     return try decoder.decode(ResponseBody.self, from: data)
   }
 
-  public func response<RequestBody: Encodable, ResponseBody: Decodable>(
-    endpoint: Endpoint<RequestBody, ResponseBody>,
+  public func response<
+    QueryItems: QueryItemsConvertible,
+    RequestBody: Encodable,
+    ResponseBody: Decodable
+  >(
+    endpoint: Endpoint<QueryItems, RequestBody, ResponseBody>,
     requestBody: RequestBody,
-    queryItems: [String: String] = [:]
+    queryItems: QueryItems
   ) async throws -> ResponseBody {
     let url = url(for: endpoint.path, queryItems: queryItems)
     let request = try request(url: url, method: endpoint.method, body: requestBody)
@@ -107,14 +127,15 @@ public actor APIClient {
     return request
   }
 
-  private func url(for path: String, queryItems: [String: String]) -> URL {
+  private func url(for path: String, queryItems: some QueryItemsConvertible) -> URL {
+    let items = [String: String](queryItems)
     let url = baseURL.appending(path: path)
-    guard !queryItems.isEmpty,
+    guard !items.isEmpty,
           var components = URLComponents(url: url, resolvingAgainstBaseURL: false) else {
       return url
     }
 
-    components.queryItems = queryItems.map { name, value in
+    components.queryItems = items.map { name, value in
       URLQueryItem(name: name, value: value)
     }
     return components.url ?? url
