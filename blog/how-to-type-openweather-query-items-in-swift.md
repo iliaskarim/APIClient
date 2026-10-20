@@ -153,4 +153,4 @@ You do not need a struct for every endpoint on day one. Start with Current Weath
 
 We’ve taken the bare-bones client from [How to Build a Bare-Bones Async JSON Client in Swift](/how-to-build-a-bare-bones-async-json-client-in-swift) and typed its query parameter the way the body types were already typed: a `QueryItemsConvertible` value on `response`, and an `Endpoint` generic that names which query belongs with which path. A `CurrentWeatherQuery` struct turns `appid`, `lat`, `lon`, and `units` into fields instead of dictionary keys, while dictionaries remain a valid escape hatch. From here you can add a 5-day query type with its own fields, or keep Stations-style `appid`-only calls as a one-property struct when you want the same pattern everywhere.
 
-*Cover image generated for this post.*
+*Cover: [Black pen and peach sticky notes rest on a silver laptop keyboard](https://wordpress.org/photos/photo/8116a1d3f1/) by [Rashed Hossain](https://rashed.im), [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/).*
