@@ -1,6 +1,6 @@
 # How to Type OpenWeather Query Items in a Swift API Client
 
-In this tutorial we will learn how to replace a stringly typed OpenWeather query dictionary with a small Swift struct. In [How to Build a Bare-Bones Async JSON Client in Swift](/how-to-build-a-bare-bones-async-json-client-in-swift) we passed `appid`, `lat`, `lon`, and `units` as a `[String: String]` into `response`. That works, but the keys are magic strings and every value is already a `String`—even latitude and longitude. We will teach the client to accept any value that can build that dictionary, then model Current Weather’s query as a named type.
+In this tutorial we will learn how to replace a stringly typed OpenWeather query dictionary with a small Swift struct. In [How to Build a Bare-Bones Async JSON Client in Swift](/how-to-build-a-bare-bones-async-json-client-in-swift) we passed `appid`, `lat`, `lon`, and `units` as a `[String: String]` into `response`. That works, but the keys are magic strings and every value is already a `String`—even latitude and longitude. We will teach the client to accept any value that can produce `[URLQueryItem]`, then model Current Weather’s query as a named type.
 
 ## Getting Started
 
@@ -22,27 +22,25 @@ let forecast: CurrentWeather = try await client.response(
 )
 ```
 
-The endpoint is still only a path and a method. The query rides on `response`, the same place a request body would. Nothing about that division changes. What changes is the *type* of `queryItems`: instead of always demanding `[String: String]`, the client will ask for something that can *produce* one.
+The endpoint is still only a path and a method. The query rides on `response`, the same place a request body would. Nothing about that division changes. What changes is the *type* of `queryItems`: instead of always demanding `[String: String]`, the client will ask for something that can *produce* `[URLQueryItem]`—the same values `URLComponents` already understands.
 
 ## Naming the Query Type
 
-Introduce a tiny protocol whose only job is to expose a dictionary the URL builder already understands:
+Introduce a tiny protocol whose only job is to expose query items the URL builder can attach as-is:
 
 ```swift
 protocol QueryItemsConvertible {
-  var queryItems: [String: String] { get }
+  var queryItems: [URLQueryItem] { get }
 }
 
 extension [String: String]: QueryItemsConvertible {
-  var queryItems: [String: String] { self }
-
-  init(_ queryItems: some QueryItemsConvertible) {
-    self = queryItems.queryItems
+  var queryItems: [URLQueryItem] {
+    map { URLQueryItem(name: $0.key, value: $0.value) }
   }
 }
 ```
 
-Dictionary literals keep working: `[String: String]` conforms, so existing call sites compile. Custom types opt in by returning the same shape of dictionary the private `url(for:queryItems:)` helper already maps to `URLQueryItem` values.
+Dictionary literals keep working: `[String: String]` conforms by mapping each entry to a `URLQueryItem`, so existing call sites compile. Custom types opt in by returning `[URLQueryItem]` directly. Going through `URLQueryItem` instead of a second dictionary means repeated names, bare keys, and source order can survive into the URL when an API needs them.
 
 `Endpoint` gains a third generic parameter so each endpoint can name the query type it expects, alongside the request and response body types you already had:
 
@@ -80,7 +78,7 @@ extension APIClient {
 }
 ```
 
-Inside `url(for:queryItems:)`, convert through the dictionary initializer and keep the same `URLComponents` + `map` path from the earlier post. The networking core does not learn about OpenWeather; it only learns how to ask any query value for `[String: String]`.
+Inside `url(for:queryItems:)`, read `queryItems.queryItems` and assign them straight onto `URLComponents`. The networking core does not learn about OpenWeather; it only learns how to ask any query value for `[URLQueryItem]`.
 
 ## A Current Weather Query Struct
 
@@ -93,18 +91,18 @@ struct CurrentWeatherQuery: QueryItemsConvertible {
   let lon: Double
   let units: String
 
-  var queryItems: [String: String] {
+  var queryItems: [URLQueryItem] {
     [
-      "appid": appid,
-      "lat": String(lat),
-      "lon": String(lon),
-      "units": units,
+      URLQueryItem(name: "appid", value: appid),
+      URLQueryItem(name: "lat", value: String(lat)),
+      URLQueryItem(name: "lon", value: String(lon)),
+      URLQueryItem(name: "units", value: units),
     ]
   }
 }
 ```
 
-`appid` and `units` stay strings because that is how OpenWeather’s query string spells them. `lat` and `lon` can be `Double` in your model; the computed `queryItems` property is where they become the decimal strings the API expects. Forgetting a field is now a compile error. Typos in key names—“`appId`” instead of “`appid`”—stop living at every call site and live in one dictionary literal inside the type.
+`appid` and `units` stay strings because that is how OpenWeather’s query string spells them. `lat` and `lon` can be `Double` in your model; the computed `queryItems` property is where they become the decimal strings the API expects. Forgetting a field is now a compile error. Typos in key names—“`appId`” instead of “`appid`”—stop living at every call site and live in one array of `URLQueryItem` values inside the type.
 
 Pin the endpoint’s query generic to that struct when you want the type system to enforce it:
 
@@ -144,7 +142,7 @@ Typed queries give you:
 
 - **Required fields** — omit `units` and the compiler complains before you hit the network.
 - **Real types at the edge** — `lat` / `lon` as `Double` in app code; stringification stays in `queryItems`.
-- **One spelling of each key** — OpenWeather’s `appid` lives in a single property wrapper around the dictionary, not in every screen that loads a forecast.
+- **One spelling of each key** — OpenWeather’s `appid` lives in a single `URLQueryItem` list inside the type, not in every screen that loads a forecast.
 - **Endpoint-shaped documentation** — `Endpoint<CurrentWeatherQuery, Void, CurrentWeather>` reads as “this GET takes that query and returns that body,” the same way request-body generics already document POST shapes.
 
 You do not need a struct for every endpoint on day one. Start with Current Weather, leave quieter calls on dictionaries, and promote a query type when the parameter list stabilizes.
