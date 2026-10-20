@@ -78,7 +78,24 @@ extension APIClient {
 }
 ```
 
-Inside `url(for:queryItems:)`, read `queryItems.queryItems` and assign them straight onto `URLComponents`. The networking core does not learn about OpenWeather; it only learns how to ask any query value for `[URLQueryItem]`.
+The earlier client post mapped a `[String: String]` into `URLQueryItem` values inside `url(for:queryItems:)`. With `QueryItemsConvertible`, that helper takes the convertible value, asks it for `[URLQueryItem]`, and assigns the array straight onto `URLComponents`:
+
+```swift
+extension APIClient {
+  private func url(for path: String, queryItems: some QueryItemsConvertible) -> URL {
+    let items = queryItems.queryItems
+    let url = baseURL.appending(path: path)
+    guard !items.isEmpty,
+          var components = URLComponents(url: url, resolvingAgainstBaseURL: false) else {
+      return url
+    }
+    components.queryItems = items
+    return components.url ?? url
+  }
+}
+```
+
+Dictionary call sites still go through the `[String: String]` conformance’s `map`. Typed queries skip that hop and hand the client the wire-ready items. The networking core does not learn about OpenWeather; it only learns how to ask any query value for `[URLQueryItem]`.
 
 ## A Current Weather Query Struct
 
