@@ -3,29 +3,6 @@ import Foundation
 import Testing
 @testable import APIClient
 
-private struct AppIDQuery: QueryItemsConvertible {
-  let appid: String
-
-  var queryItems: [URLQueryItem] {
-    [URLQueryItem(name: "appid", value: appid)]
-  }
-}
-
-private struct Measurement: Codable {
-  let stationId: String
-  let dt: Date
-  let temperature: Double
-}
-
-private struct Station: Codable {
-  let id: String?
-  let externalId: String
-  let name: String
-  let latitude: Double
-  let longitude: Double
-  let altitude: Double
-}
-
 private extension URLRequest {
   func componentsAndQueryItems() throws -> (URLComponents, [String: String?]) {
     let url = try #require(self.url)
@@ -39,6 +16,29 @@ private extension URLRequest {
 
 @Suite(.serialized)
 struct APIClientTests {
+  private struct AppIDQuery: QueryItemsConvertible {
+    let appid: String
+
+    var queryItems: [URLQueryItem] {
+      [URLQueryItem(name: "appid", value: appid)]
+    }
+  }
+
+  private struct Measurement: Codable {
+    let stationId: String
+    let dt: Date
+    let temperature: Double
+  }
+
+  private struct Station: Codable {
+    let id: String?
+    let externalId: String
+    let name: String
+    let latitude: Double
+    let longitude: Double
+    let altitude: Double
+  }
+
   private static let fixture = Fixture()
 
   private static let session = fixture.makeSession()
