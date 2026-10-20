@@ -1,6 +1,6 @@
 # APIClient
 
-Bare-bones async JSON client. `Endpoint` is a path, an HTTP method, and the types of its query, request body, and response body. Pass query items into `response` the same way you pass a request body: a dictionary literal, or any type that can initialize `[String: String]`.
+Bare-bones async JSON client. `Endpoint` is a path, an HTTP method, and the types of its query, request body, and response body. Pass query items into `response` the same way you pass a request body: a dictionary literal, or any type that exposes `[URLQueryItem]`.
 
 ## Installation
 

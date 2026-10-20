@@ -6,8 +6,8 @@ import Testing
 private struct AppIDQuery: QueryItemsConvertible {
   let appid: String
 
-  var queryItems: [String: String] {
-    ["appid": appid]
+  var queryItems: [URLQueryItem] {
+    [URLQueryItem(name: "appid", value: appid)]
   }
 }
 

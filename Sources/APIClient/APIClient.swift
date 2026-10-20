@@ -1,16 +1,12 @@
 import Foundation
 
 public protocol QueryItemsConvertible {
-  var queryItems: [String: String] { get }
+  var queryItems: [URLQueryItem] { get }
 }
 
 extension [String: String]: QueryItemsConvertible {
-  public var queryItems: [String: String] {
-    self
-  }
-
-  public init(_ queryItems: some QueryItemsConvertible) {
-    self = queryItems.queryItems
+  public var queryItems: [URLQueryItem] {
+    map { URLQueryItem(name: $0.key, value: $0.value) }
   }
 }
 
@@ -128,16 +124,14 @@ public actor APIClient {
   }
 
   private func url(for path: String, queryItems: some QueryItemsConvertible) -> URL {
-    let items = [String: String](queryItems)
+    let items = queryItems.queryItems
     let url = baseURL.appending(path: path)
     guard !items.isEmpty,
           var components = URLComponents(url: url, resolvingAgainstBaseURL: false) else {
       return url
     }
 
-    components.queryItems = items.map { name, value in
-      URLQueryItem(name: name, value: value)
-    }
+    components.queryItems = items
     return components.url ?? url
   }
 }
