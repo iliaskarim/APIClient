@@ -89,6 +89,7 @@ extension APIClient {
           var components = URLComponents(url: url, resolvingAgainstBaseURL: false) else {
       return url
     }
+
     components.queryItems = items
     return components.url ?? url
   }
