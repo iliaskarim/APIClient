@@ -43,34 +43,6 @@ struct APIClientTests {
 
   private static let session = fixture.makeSession()
 
-  private static let stationResponseBody = Data(
-    """
-    {
-      "id": "station-1",
-      "external_id": "SF_TEST001",
-      "name": "San Francisco Test Station",
-      "latitude": 37.76,
-      "longitude": -122.43,
-      "altitude": 150
-    }
-    """.utf8
-  )
-
-  private static let stationsResponseBody = Data(
-    """
-    [
-      {
-        "id": "station-1",
-        "external_id": "SF_TEST001",
-        "name": "San Francisco Test Station",
-        "latitude": 37.76,
-        "longitude": -122.43,
-        "altitude": 150
-      }
-    ]
-    """.utf8
-  )
-
   /// DELETE /stations/{id}. No request body, empty response. Query items come from a custom type.
   @Test
   func responseSendsNoBodyAndAcceptsAnEmptyResponse() async throws {
@@ -103,7 +75,23 @@ struct APIClientTests {
   /// GET /stations. No request body, decoded response.
   @Test
   func responseSendsNoBodyAndDecodesTheResponse() async throws {
-    Self.fixture.setResponse(statusCode: 200, body: Self.stationsResponseBody)
+    Self.fixture.setResponse(
+      statusCode: 200,
+      body: Data(
+        """
+        [
+          {
+            "id": "station-1",
+            "external_id": "SF_TEST001",
+            "name": "San Francisco Test Station",
+            "latitude": 37.76,
+            "longitude": -122.43,
+            "altitude": 150
+          }
+        ]
+        """.utf8
+      )
+    )
 
     let decoder = JSONDecoder()
     decoder.keyDecodingStrategy = .convertFromSnakeCase
@@ -188,7 +176,21 @@ struct APIClientTests {
   /// POST /stations. Encoded request body, decoded response.
   @Test
   func responseSendsTheEncodedBodyAndDecodesTheResponse() async throws {
-    Self.fixture.setResponse(statusCode: 200, body: Self.stationResponseBody)
+    Self.fixture.setResponse(
+      statusCode: 200,
+      body: Data(
+        """
+        {
+          "id": "station-1",
+          "external_id": "SF_TEST001",
+          "name": "San Francisco Test Station",
+          "latitude": 37.76,
+          "longitude": -122.43,
+          "altitude": 150
+        }
+        """.utf8
+      )
+    )
 
     let encoder = JSONEncoder()
     encoder.keyEncodingStrategy = .convertToSnakeCase
