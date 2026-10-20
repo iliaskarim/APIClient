@@ -43,7 +43,8 @@ struct APIClientTests {
 
   private static let session = fixture.makeSession()
 
-  /// DELETE /stations/{id}. No request body, empty response. Query items come from a custom type.
+  /// DELETE /stations/{id}. No request body, empty response. Query items come
+  /// from a custom type.
   @Test
   func responseSendsNoBodyAndAcceptsAnEmptyResponse() async throws {
     Self.fixture.setResponse(statusCode: 204)
