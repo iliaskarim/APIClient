@@ -3,21 +3,6 @@ import Foundation
 import Testing
 @testable import APIClient
 
-private struct Measurement: Codable {
-  let stationId: String
-  let dt: Date
-  let temperature: Double
-}
-
-private struct Station: Codable {
-  let id: String?
-  let externalId: String
-  let name: String
-  let latitude: Double
-  let longitude: Double
-  let altitude: Double
-}
-
 private extension URLRequest {
   func componentsAndQueryItems() throws -> (URLComponents, [String: String?]) {
     let url = try #require(self.url)
@@ -31,51 +16,64 @@ private extension URLRequest {
 
 @Suite(.serialized)
 struct APIClientTests {
+  private struct AppIDQuery: QueryItemsConvertible {
+    let appid: String
+
+    var queryItems: [URLQueryItem] {
+      [URLQueryItem(name: "appid", value: appid)]
+    }
+  }
+
+  private struct Measurement: Codable {
+    let stationId: String
+    let dt: Date
+    let temperature: Double
+  }
+
+  private struct Station: Codable {
+    let id: String?
+    let externalId: String
+    let name: String
+    let latitude: Double
+    let longitude: Double
+    let altitude: Double
+  }
+
+  private static let client = APIClient(
+    baseURL: URL(string: "https://api.openweathermap.org")!,
+    session: session,
+    encoder: encoder,
+    decoder: decoder
+  )
+
+  private static let decoder: JSONDecoder = {
+    let decoder = JSONDecoder()
+    decoder.keyDecodingStrategy = .convertFromSnakeCase
+    return decoder
+  }()
+
+  private static let encoder: JSONEncoder = {
+    let encoder = JSONEncoder()
+    encoder.dateEncodingStrategy = .secondsSince1970
+    encoder.keyEncodingStrategy = .convertToSnakeCase
+    encoder.outputFormatting = .sortedKeys
+    return encoder
+  }()
+
   private static let fixture = Fixture()
 
   private static let session = fixture.makeSession()
 
-  private static let stationResponseBody = Data(
-    """
-    {
-      "id": "station-1",
-      "external_id": "SF_TEST001",
-      "name": "San Francisco Test Station",
-      "latitude": 37.76,
-      "longitude": -122.43,
-      "altitude": 150
-    }
-    """.utf8
-  )
-
-  private static let stationsResponseBody = Data(
-    """
-    [
-      {
-        "id": "station-1",
-        "external_id": "SF_TEST001",
-        "name": "San Francisco Test Station",
-        "latitude": 37.76,
-        "longitude": -122.43,
-        "altitude": 150
-      }
-    ]
-    """.utf8
-  )
-
-  /// DELETE /stations/{id}. No request body, empty response.
+  /// [DELETE /stations/{id}](https://openweathermap.org/api/stations#delete_station).
+  ///
+  /// No request body, empty response. Query items come from a custom type.
   @Test
   func responseSendsNoBodyAndAcceptsAnEmptyResponse() async throws {
     Self.fixture.setResponse(statusCode: 204)
 
-    let client = try APIClient(
-      baseURL: #require(URL(string: "https://api.openweathermap.org")),
-      session: Self.session
-    )
-
-    try await client.response(
+    try await Self.client.response(
       endpoint: .init(path: "data/3.0/stations/station-1", method: "DELETE"),
-      queryItems: ["appid": "API_KEY"]
+      queryItems: AppIDQuery(appid: "API_KEY")
     )
 
     let request = try #require(Self.fixture.requests.last)
@@ -92,20 +90,30 @@ struct APIClientTests {
     #expect(items == ["appid": "API_KEY"])
   }
 
-  /// GET /stations. No request body, decoded response.
+  /// [GET /stations](https://openweathermap.org/api/stations#get_stations).
+  ///
+  /// No request body, decoded response.
   @Test
   func responseSendsNoBodyAndDecodesTheResponse() async throws {
-    Self.fixture.setResponse(statusCode: 200, body: Self.stationsResponseBody)
-
-    let decoder = JSONDecoder()
-    decoder.keyDecodingStrategy = .convertFromSnakeCase
-    let client = try APIClient(
-      baseURL: #require(URL(string: "https://api.openweathermap.org")),
-      session: Self.session,
-      decoder: decoder
+    Self.fixture.setResponse(
+      statusCode: 200,
+      body: Data(
+        """
+        [
+          {
+            "id": "station-1",
+            "external_id": "SF_TEST001",
+            "name": "San Francisco Test Station",
+            "latitude": 37.76,
+            "longitude": -122.43,
+            "altitude": 150
+          }
+        ]
+        """.utf8
+      )
     )
 
-    let decoded: [Station] = try await client.response(
+    let decoded: [Station] = try await Self.client.response(
       endpoint: .init(path: "data/3.0/stations"),
       queryItems: ["appid": "API_KEY"]
     )
@@ -131,24 +139,12 @@ struct APIClientTests {
     #expect(decoded.first?.altitude == 150)
   }
 
-  /// POST /measurements. Encoded request body, empty response.
+  /// [POST /measurements](https://openweathermap.org/api/stations#measurement).
+  ///
+  /// Encoded request body, empty response.
   @Test
   func responseSendsTheEncodedBodyAndAcceptsAnEmptyResponse() async throws {
     Self.fixture.setResponse(statusCode: 204)
-
-    let encoder = JSONEncoder()
-    encoder.dateEncodingStrategy = .secondsSince1970
-    encoder.keyEncodingStrategy = .convertToSnakeCase
-    encoder.outputFormatting = .sortedKeys
-    let decoder = JSONDecoder()
-    decoder.dateDecodingStrategy = .secondsSince1970
-    decoder.keyDecodingStrategy = .convertFromSnakeCase
-    let client = try APIClient(
-      baseURL: #require(URL(string: "https://api.openweathermap.org")),
-      session: Self.session,
-      encoder: encoder,
-      decoder: decoder
-    )
 
     let measurement = Measurement(
       stationId: "station-1",
@@ -156,7 +152,7 @@ struct APIClientTests {
       temperature: 18.7
     )
 
-    try await client.response(
+    try await Self.client.response(
       endpoint: .init(path: "data/3.0/measurements", method: "POST"),
       requestBody: [measurement],
       queryItems: ["appid": "API_KEY"]
@@ -164,7 +160,7 @@ struct APIClientTests {
 
     let request = try #require(Self.fixture.requests.last)
     let (components, items) = try request.componentsAndQueryItems()
-    let encoded = try encoder.encode([measurement])
+    let encoded = try Self.encoder.encode([measurement])
 
     #expect(request.httpMethod == "POST")
     #expect(request.value(forHTTPHeaderField: "Accept") == "application/json")
@@ -177,21 +173,25 @@ struct APIClientTests {
     #expect(items == ["appid": "API_KEY"])
   }
 
-  /// POST /stations. Encoded request body, decoded response.
+  /// [POST /stations](https://openweathermap.org/api/stations#create_station).
+  ///
+  /// Encoded request body, decoded response.
   @Test
   func responseSendsTheEncodedBodyAndDecodesTheResponse() async throws {
-    Self.fixture.setResponse(statusCode: 200, body: Self.stationResponseBody)
-
-    let encoder = JSONEncoder()
-    encoder.keyEncodingStrategy = .convertToSnakeCase
-    encoder.outputFormatting = .sortedKeys
-    let decoder = JSONDecoder()
-    decoder.keyDecodingStrategy = .convertFromSnakeCase
-    let client = try APIClient(
-      baseURL: #require(URL(string: "https://api.openweathermap.org")),
-      session: Self.session,
-      encoder: encoder,
-      decoder: decoder
+    Self.fixture.setResponse(
+      statusCode: 200,
+      body: Data(
+        """
+        {
+          "id": "station-1",
+          "external_id": "SF_TEST001",
+          "name": "San Francisco Test Station",
+          "latitude": 37.76,
+          "longitude": -122.43,
+          "altitude": 150
+        }
+        """.utf8
+      )
     )
 
     let station = Station(
@@ -203,7 +203,7 @@ struct APIClientTests {
       altitude: 150
     )
 
-    let decoded: Station = try await client.response(
+    let decoded: Station = try await Self.client.response(
       endpoint: .init(path: "data/3.0/stations", method: "POST"),
       requestBody: station,
       queryItems: ["appid": "API_KEY"]
@@ -211,7 +211,7 @@ struct APIClientTests {
 
     let request = try #require(Self.fixture.requests.last)
     let (components, items) = try request.componentsAndQueryItems()
-    let encoded = try encoder.encode(station)
+    let encoded = try Self.encoder.encode(station)
 
     #expect(request.httpMethod == "POST")
     #expect(request.value(forHTTPHeaderField: "Accept") == "application/json")
