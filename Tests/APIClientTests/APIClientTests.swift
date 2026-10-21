@@ -114,7 +114,7 @@ struct APIClientTests {
     )
 
     let decoded: [Station] = try await Self.client.response(
-      endpoint: .init(path: "data/3.0/stations"),
+      "data/3.0/stations",
       queryItems: ["appid": "API_KEY"]
     )
 
@@ -153,7 +153,7 @@ struct APIClientTests {
     )
 
     try await Self.client.response(
-      endpoint: .init(path: "data/3.0/measurements", method: "POST"),
+      "data/3.0/measurements",
       requestBody: [measurement],
       queryItems: ["appid": "API_KEY"]
     )
@@ -204,7 +204,7 @@ struct APIClientTests {
     )
 
     let decoded: Station = try await Self.client.response(
-      endpoint: .init(path: "data/3.0/stations", method: "POST"),
+      "data/3.0/stations",
       requestBody: station,
       queryItems: ["appid": "API_KEY"]
     )

@@ -81,6 +81,60 @@ public actor APIClient {
     return try decoder.decode(ResponseBody.self, from: data)
   }
 
+  public func response<QueryItems: QueryItemsConvertible>(
+    _ path: String,
+    queryItems: QueryItems
+  ) async throws {
+    try await response(
+      endpoint: VoidBodyEndpoint<QueryItems>(path: path),
+      queryItems: queryItems
+    )
+  }
+
+  public func response<QueryItems: QueryItemsConvertible, RequestBody: Encodable>(
+    _ path: String,
+    requestBody: RequestBody,
+    queryItems: QueryItems
+  ) async throws {
+    try await response(
+      endpoint: VoidResponseBodyEndpoint<QueryItems, RequestBody>(
+        path: path,
+        method: "POST"
+      ),
+      requestBody: requestBody,
+      queryItems: queryItems
+    )
+  }
+
+  public func response<QueryItems: QueryItemsConvertible, ResponseBody: Decodable>(
+    _ path: String,
+    queryItems: QueryItems
+  ) async throws -> ResponseBody {
+    try await response(
+      endpoint: VoidRequestBodyEndpoint<QueryItems, ResponseBody>(path: path),
+      queryItems: queryItems
+    )
+  }
+
+  public func response<
+    QueryItems: QueryItemsConvertible,
+    RequestBody: Encodable,
+    ResponseBody: Decodable
+  >(
+    _ path: String,
+    requestBody: RequestBody,
+    queryItems: QueryItems
+  ) async throws -> ResponseBody {
+    try await response(
+      endpoint: Endpoint<QueryItems, RequestBody, ResponseBody>(
+        path: path,
+        method: "POST"
+      ),
+      requestBody: requestBody,
+      queryItems: queryItems
+    )
+  }
+
   public init(
     baseURL: URL,
     bearerToken: String? = nil,
