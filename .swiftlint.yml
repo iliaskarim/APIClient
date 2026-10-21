@@ -48,6 +48,9 @@ nesting:
 non_optional_string_data_conversion:
   include_variables: true
 
+unused_declaration:
+  include_public_and_open: true
+
 # Swift Package Manager build directory.
 excluded:
   - .build
