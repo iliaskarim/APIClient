@@ -160,5 +160,3 @@ If the user denied access, `authorizationStatus` stays `.denied` until they chan
 ## Conclusion
 
 We’ve replaced hard-coded Brooklyn coordinates with a When In Use Core Location flow: a privacy usage string, a `CLLocationManager` that requests authorization, a one-shot `requestLocation()` wrapped in `async`, and the resulting `Double` latitude and longitude passed into `CurrentWeatherQuery`. The bare-bones client from [How to Build a Bare-Bones Async JSON Client in Swift](/how-to-build-a-bare-bones-async-json-client-in-swift) and the typed query from [How to Type OpenWeather Query Items in a Swift API Client](/how-to-type-openweather-query-items-in-swift) stay as they are—only the source of `lat` and `lon` moved from a literal to the device. From here you can cache the last good coordinate for offline launches, or let the user pin a city when they decline the prompt, without teaching the API client anything about GPS.
-
-*Cover: [Tribeca alley](https://commons.wikimedia.org/wiki/File:Tribeca_alley_(42452688954).jpg) by [Billie Grace Ward](https://www.flickr.com/people/15802578@N00/), [CC BY 2.0](https://creativecommons.org/licenses/by/2.0/); map pin added.*
