@@ -13,6 +13,13 @@ extension [String: String]: QueryItemsConvertible {
   }
 }
 
+extension [URLQueryItem]: @retroactive ExpressibleByDictionaryLiteral {
+  /// One query item per pair, in source order. The key is the name and the value is the value.
+  public init(dictionaryLiteral elements: (String, String)...) {
+    self = elements.map { URLQueryItem(name: $0.0, value: $0.1) }
+  }
+}
+
 /// Path, HTTP method, and the types of the query, request body, and response body.
 ///
 /// `RequestBody` and `ResponseBody` are `Void` when that side of the call has no
