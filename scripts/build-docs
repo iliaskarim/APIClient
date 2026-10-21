@@ -1,0 +1,45 @@
+#!/bin/bash
+set -ex
+
+# toolchain paths – adjust if Xcode is installed elsewhere
+DOCC="/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/docc"
+
+# derive scheme name from the current directory (assumes project directory
+# name matches the product/scheme name).
+SCHEME="$(basename "$(pwd)")"
+
+# clean docs
+rm -rf .build build docs
+
+# build docs
+xcodebuild docbuild \
+    -scheme "$SCHEME" \
+    -destination 'platform=macOS,arch=arm64,name=My Mac' \
+    -derivedDataPath build > /dev/null
+$DOCC process-archive transform-for-static-hosting \
+    --output-path ./docs \
+    --hosting-base-path "/$SCHEME" \
+    "./build/Build/Products/Debug/$SCHEME.doccarchive" > /dev/null
+
+# DocC has no route for the site root, and its root index.html still loads
+# scripts from `/`. GitHub Pages serves that file for /$SCHEME/.
+MODULE="$(basename "$(find ./docs/documentation -mindepth 1 -maxdepth 1 -type d -print -quit)")"
+TARGET="/$SCHEME/documentation/$MODULE/"
+cat > ./docs/index.html <<EOF
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="refresh" content="0; url=${TARGET}">
+<link rel="canonical" href="${TARGET}">
+<title>${SCHEME}</title>
+<script>location.replace("${TARGET}")</script>
+</head>
+<body>
+<p><a href="${TARGET}">${SCHEME} Documentation</a></p>
+</body>
+</html>
+EOF
+
+# GitHub Pages runs Jekyll unless this file is present.
+touch ./docs/.nojekyll
