@@ -20,7 +20,7 @@ struct APIClientTests {
     let appid: String
 
     var queryItems: [URLQueryItem] {
-      [URLQueryItem(name: "appid", value: appid)]
+      ["appid": appid]
     }
   }
 
