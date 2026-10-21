@@ -1,6 +1,6 @@
 # APIClient
 
-Bare-bones async JSON client. `Endpoint` is a path, an HTTP method, and the types of its query, request body, and response body. Pass query items into `response` the same way you pass a request body: a dictionary literal, or any type that exposes `[URLQueryItem]`.
+Bare-bones async JSON client. A path string passed to `response` is a GET, or a POST when the call includes a request body. Pass an `Endpoint` to name another method: it carries the path, the method, and the types of the query, request body, and response body. Pass query items into `response` the same way you pass a request body: a dictionary literal, or any type that exposes `[URLQueryItem]`.
 
 ## Installation
 
@@ -10,7 +10,7 @@ Bare-bones async JSON client. `Endpoint` is a path, an HTTP method, and the type
 
 ## Usage
 
-`response` has four overloads, one for each combination of request body and response body: neither, request only, response only, or both. The sections below walk through each shape against [OpenWeather’s Stations API](https://openweathermap.org/stations)—one real API that exposes every combination.
+`response` has an overload for each combination of request body and response body: neither, request only, response only, or both. A path string selects GET or POST. An `Endpoint` selects the method. The sections below walk through each shape against [OpenWeather’s Stations API](https://openweathermap.org/stations).
 
 ### Models
 
@@ -51,7 +51,7 @@ let client = APIClient(
 
 ```swift
 let stations: [Station] = try await client.response(
-  endpoint: Endpoint(path: "data/3.0/stations"),
+  "data/3.0/stations",
   queryItems: ["appid": apiKey]
 )
 ```
@@ -62,7 +62,7 @@ let stations: [Station] = try await client.response(
 
 ```swift
 let created: Station = try await client.response(
-  endpoint: Endpoint(path: "data/3.0/stations", method: "POST"),
+  "data/3.0/stations",
   requestBody: Station(
     id: nil,
     externalId: "SF_TEST001",
@@ -81,7 +81,7 @@ let created: Station = try await client.response(
 
 ```swift
 try await client.response(
-  endpoint: Endpoint(path: "data/3.0/measurements", method: "POST"),
+  "data/3.0/measurements",
   requestBody: [
     Measurement(
       stationId: created.id!,
@@ -95,7 +95,7 @@ try await client.response(
 
 ### No request body → no response body
 
-`DELETE /stations/{id}` removes a station and its measurements. A successful response is `204` with an empty body.
+`DELETE /stations/{id}` removes a station and its measurements. A successful response is `204` with an empty body. A path string with no body sends GET, so this call passes an `Endpoint`.
 
 ```swift
 try await client.response(
