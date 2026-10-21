@@ -13,3 +13,7 @@ analyze:
 # Run unit tests with coverage and write an HTML report to coverage/.
 test:
     bash scripts/coverage
+
+# Build the DocC site into docs/ for GitHub Pages.
+docs:
+    bash scripts/build-docs
