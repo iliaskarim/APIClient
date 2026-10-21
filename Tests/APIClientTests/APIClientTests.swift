@@ -64,8 +64,9 @@ struct APIClientTests {
 
   private static let session = fixture.makeSession()
 
-  /// DELETE /stations/{id}. No request body, empty response. Query items come
-  /// from a custom type.
+  /// [DELETE /stations/{id}](https://openweathermap.org/api/stations#delete_station).
+  ///
+  /// No request body, empty response. Query items come from a custom type.
   @Test
   func responseSendsNoBodyAndAcceptsAnEmptyResponse() async throws {
     Self.fixture.setResponse(statusCode: 204)
@@ -89,7 +90,9 @@ struct APIClientTests {
     #expect(items == ["appid": "API_KEY"])
   }
 
-  /// GET /stations. No request body, decoded response.
+  /// [GET /stations](https://openweathermap.org/api/stations#get_stations).
+  ///
+  /// No request body, decoded response.
   @Test
   func responseSendsNoBodyAndDecodesTheResponse() async throws {
     Self.fixture.setResponse(
@@ -136,7 +139,9 @@ struct APIClientTests {
     #expect(decoded.first?.altitude == 150)
   }
 
-  /// POST /measurements. Encoded request body, empty response.
+  /// [POST /measurements](https://openweathermap.org/api/stations#measurement).
+  ///
+  /// Encoded request body, empty response.
   @Test
   func responseSendsTheEncodedBodyAndAcceptsAnEmptyResponse() async throws {
     Self.fixture.setResponse(statusCode: 204)
@@ -168,7 +173,9 @@ struct APIClientTests {
     #expect(items == ["appid": "API_KEY"])
   }
 
-  /// POST /stations. Encoded request body, decoded response.
+  /// [POST /stations](https://openweathermap.org/api/stations#create_station).
+  ///
+  /// Encoded request body, decoded response.
   @Test
   func responseSendsTheEncodedBodyAndDecodesTheResponse() async throws {
     Self.fixture.setResponse(
