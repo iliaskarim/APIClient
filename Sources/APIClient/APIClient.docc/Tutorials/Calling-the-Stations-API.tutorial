@@ -1,0 +1,122 @@
+@Tutorial(time: 15) {
+  @Intro(title: "Calling the Stations API") {
+    Use `APIClient.response` against OpenWeather Stations. Each step adds one
+    call so the listing grows in lifecycle order: create, list, post
+    measurements, get measurements, delete.
+
+    @Image(source: tutorial-intro.png, alt: "Abstract teal gradient with a circular highlight, suggesting a clear request path.")
+  }
+
+  @Section(title: "Set up models and the client") {
+    @ContentAndMedia {
+      Define `Codable` models and configure snake-case JSON encoding to match
+      the Stations API. Replace `YOUR_API_KEY` with a real OpenWeather key
+      before running the calls.
+
+      @Image(source: tutorial-section.png, alt: "Abstract teal gradient with a circular highlight.")
+    }
+
+    @Steps {
+      @Step {
+        Create the station and measurement types, configure the encoder and
+        decoder, and build a client rooted at the OpenWeather host.
+
+        @Code(name: "Stations.swift", file: stations-01-setup.swift)
+      }
+    }
+  }
+
+  @Section(title: "Create and list stations") {
+    @ContentAndMedia {
+      A path string with a request body is POST. The same path with no body is
+      GET. Both overloads decode the JSON response when you ask for a return
+      type.
+
+      @Image(source: tutorial-section.png, alt: "Abstract teal gradient with a circular highlight.")
+    }
+
+    @Steps {
+      @Step {
+        Register a station with `POST /stations`. Pass the station as
+        `requestBody` and decode the created station, which includes the
+        server-assigned `id`.
+
+        @Code(
+          name: "Stations.swift",
+          file: stations-02-create.swift,
+          previousFile: stations-01-setup.swift
+        )
+      }
+
+      @Step {
+        List every station on the account with `GET /stations`. A path string
+        and a decoded return type select the no-body overload.
+
+        @Code(
+          name: "Stations.swift",
+          file: stations-03-list.swift,
+          previousFile: stations-02-create.swift
+        )
+      }
+    }
+  }
+
+  @Section(title: "Post and read measurements") {
+    @ContentAndMedia {
+      Uploading readings uses an encodable body and discards an empty `204`
+      response. Reading aggregated history is another GET with query items
+      that select the station and time window.
+
+      @Image(source: tutorial-section.png, alt: "Abstract teal gradient with a circular highlight.")
+    }
+
+    @Steps {
+      @Step {
+        Upload readings with `POST /measurements`. The successful response has
+        no body, so there is nothing to decode.
+
+        @Code(
+          name: "Stations.swift",
+          file: stations-04-post-measurements.swift,
+          previousFile: stations-03-list.swift
+        )
+      }
+
+      @Step {
+        Fetch aggregated readings with `GET /measurements`. Pass
+        `station_id`, aggregation `type`, `limit`, and the `from` / `to`
+        window as query items.
+
+        @Code(
+          name: "Stations.swift",
+          file: stations-05-get-measurements.swift,
+          previousFile: stations-04-post-measurements.swift
+        )
+      }
+    }
+  }
+
+  @Section(title: "Delete the station") {
+    @ContentAndMedia {
+      A bare path string cannot express DELETE. Pass an `Endpoint` with the
+      method so `response` sends the right verb and still accepts an empty
+      body.
+
+      @Image(source: tutorial-section.png, alt: "Abstract teal gradient with a circular highlight.")
+    }
+
+    @Steps {
+      @Step {
+        Remove the station (and its measurements) with
+        `DELETE /stations/{id}`. Pass `Endpoint(path:method:)` and no request
+        body.
+
+        @Code(
+          name: "Stations.swift",
+          file: stations-06-delete.swift,
+          previousFile: stations-05-get-measurements.swift
+        )
+      }
+    }
+  }
+}

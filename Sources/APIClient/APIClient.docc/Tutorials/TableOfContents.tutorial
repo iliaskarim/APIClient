@@ -1,0 +1,18 @@
+@Tutorials(name: "APIClient") {
+  @Intro(title: "Call an HTTP API with APIClient") {
+    Walk through every body shape `response` supports against
+    [OpenWeather’s Stations API](https://openweathermap.org/stations): create a
+    station, list stations, post and read measurements, then delete the station.
+
+    @Image(source: tutorial-intro.png, alt: "Abstract teal gradient with a circular highlight, suggesting a clear request path.")
+  }
+
+  @Chapter(name: "Stations walkthrough") {
+    One ordered tutorial covers the four test endpoints plus fetching
+    measurements, in call order rather than as separate reference pages.
+
+    @Image(source: tutorial-chapter.png, alt: "Abstract teal gradient with a circular highlight.")
+
+    @TutorialReference(tutorial: "doc:Calling-the-Stations-API")
+  }
+}
