@@ -10,7 +10,7 @@ Bare-bones async JSON client. A path string passed to `response` is a GET, or a 
 
 ## Usage
 
-`response` has an overload for each combination of request body and response body: neither, request only, response only, or both. A path string selects GET or POST. An `Endpoint` selects the method. The sections below walk through each shape against [OpenWeather’s Stations API](https://openweathermap.org/stations).
+`response` has an overload for each combination of request body and response body: neither, request only, response only, or both. A path string selects GET or POST. An `Endpoint` selects the method. The sections below walk through each shape against [OpenWeather’s Stations API](https://openweathermap.org/stations). The same flow is an ordered DocC tutorial in Xcode (Product → Build Documentation → APIClient tutorials): create station, list stations, post measurements, get measurements, delete station.
 
 ### Models
 
