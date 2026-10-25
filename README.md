@@ -1,6 +1,6 @@
 # APIClient
 
-Bare-bones async JSON client. A path string passed to `response` is a GET, or a POST when the call includes a request body. Pass an `Endpoint` to name another method: it carries the path, the method, and the types of the query, request body, and response body. Pass query items into `response` the same way you pass a request body: a dictionary literal, or any type that exposes `[URLQueryItem]`.
+Bare-bones async JSON client. A path string passed to `response` is a GET, or a POST when the call includes a request body. Pass an `Endpoint` to name another method: it carries the path, the method, and the types of the query, request body, and response body. Pass query items into `response` the same way you pass a request body: a dictionary literal, or any type that exposes `[URLQueryItem]`. Pass `headers` the same way when a call needs fields beyond the client's `Accept`, `Content-Type`, and optional bearer `Authorization`.
 
 ## Installation
 
@@ -52,7 +52,8 @@ let client = APIClient(
 ```swift
 let stations: [Station] = try await client.response(
   "data/3.0/stations",
-  queryItems: ["appid": apiKey]
+  queryItems: ["appid": apiKey],
+  headers: ["X-Request-ID": "list-stations"]
 )
 ```
 

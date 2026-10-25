@@ -1,4 +1,7 @@
 import Foundation
+#if canImport(FoundationNetworking)
+import FoundationNetworking
+#endif
 
 /// A type that produces the query items for a request URL.
 public protocol QueryItemsConvertible {
@@ -55,13 +58,14 @@ public typealias VoidResponseBodyEndpoint<QueryItems, RequestBody> =
 ///
 /// A path string is sent as GET, or as POST when the call includes a request body.
 /// Pass an `Endpoint` to choose another method. Query items are appended to the URL.
-/// Request bodies are encoded with the client's encoder and sent as JSON. Response
-/// bodies are decoded with the client's decoder.
+/// Custom headers are applied on top of the client's defaults. Request bodies are
+/// encoded with the client's encoder and sent as JSON. Response bodies are decoded
+/// with the client's decoder.
 ///
 /// Every request sets `Accept` to `application/json`. A request with a body also sets
 /// `Content-Type` to `application/json`. When `bearerToken` is set, the request sets
-/// `Authorization` to `Bearer <token>`. A status code outside 200..<300 throws
-/// `URLError.badServerResponse`.
+/// `Authorization` to `Bearer <token>`. Pass `headers` to add or override fields for
+/// that call. A status code outside 200..<300 throws `URLError.badServerResponse`.
 public actor APIClient {
   /// Token sent as `Authorization: Bearer <token>` when non-nil.
   ///
@@ -78,14 +82,17 @@ public actor APIClient {
   /// - Parameters:
   ///   - endpoint: Path and HTTP method for a call with no request or response body.
   ///   - queryItems: Query string appended to the URL. An empty collection adds no query.
+  ///   - headers: Extra header fields for this call. Values replace any default with
+  ///     the same name.
   /// - Throws: `URLError.badServerResponse` when the status code is outside
   ///   200..<300, or an error raised by `URLSession`.
   public func response<QueryItems: QueryItemsConvertible>(
     endpoint: VoidBodyEndpoint<QueryItems>,
-    queryItems: QueryItems
+    queryItems: QueryItems,
+    headers: [String: String] = [:]
   ) async throws {
     let url = url(for: endpoint.path, queryItems: queryItems)
-    let request = request(url: url, method: endpoint.method)
+    let request = request(url: url, method: endpoint.method, headers: headers)
     try await performRequest(request)
   }
 
@@ -95,16 +102,24 @@ public actor APIClient {
   ///   - endpoint: Path and HTTP method for a call with no response body.
   ///   - requestBody: Value encoded as the JSON request body.
   ///   - queryItems: Query string appended to the URL. An empty collection adds no query.
+  ///   - headers: Extra header fields for this call. Values replace any default with
+  ///     the same name.
   /// - Throws: `URLError.badServerResponse` when the status code is outside
   ///   200..<300, an encoding error when `requestBody` cannot be encoded, or an error
   ///   raised by `URLSession`.
   public func response<QueryItems: QueryItemsConvertible, RequestBody: Encodable>(
     endpoint: VoidResponseBodyEndpoint<QueryItems, RequestBody>,
     requestBody: RequestBody,
-    queryItems: QueryItems
+    queryItems: QueryItems,
+    headers: [String: String] = [:]
   ) async throws {
     let url = url(for: endpoint.path, queryItems: queryItems)
-    let request = try request(url: url, method: endpoint.method, body: requestBody)
+    let request = try request(
+      url: url,
+      method: endpoint.method,
+      body: requestBody,
+      headers: headers
+    )
     try await performRequest(request)
   }
 
@@ -113,16 +128,19 @@ public actor APIClient {
   /// - Parameters:
   ///   - endpoint: Path and HTTP method for a call with no request body.
   ///   - queryItems: Query string appended to the URL. An empty collection adds no query.
+  ///   - headers: Extra header fields for this call. Values replace any default with
+  ///     the same name.
   /// - Returns: The response body decoded as `ResponseBody`.
   /// - Throws: `URLError.badServerResponse` when the status code is outside
   ///   200..<300, a decoding error when the body does not match `ResponseBody`, or an
   ///   error raised by `URLSession`.
   public func response<QueryItems: QueryItemsConvertible, ResponseBody: Decodable>(
     endpoint: VoidRequestBodyEndpoint<QueryItems, ResponseBody>,
-    queryItems: QueryItems
+    queryItems: QueryItems,
+    headers: [String: String] = [:]
   ) async throws -> ResponseBody {
     let url = url(for: endpoint.path, queryItems: queryItems)
-    let request = request(url: url, method: endpoint.method)
+    let request = request(url: url, method: endpoint.method, headers: headers)
     let data = try await performRequest(request)
     return try decoder.decode(ResponseBody.self, from: data)
   }
@@ -133,6 +151,8 @@ public actor APIClient {
   ///   - endpoint: Path and HTTP method for the call.
   ///   - requestBody: Value encoded as the JSON request body.
   ///   - queryItems: Query string appended to the URL. An empty collection adds no query.
+  ///   - headers: Extra header fields for this call. Values replace any default with
+  ///     the same name.
   /// - Returns: The response body decoded as `ResponseBody`.
   /// - Throws: `URLError.badServerResponse` when the status code is outside
   ///   200..<300, an encoding error when `requestBody` cannot be encoded, a decoding
@@ -145,10 +165,16 @@ public actor APIClient {
   >(
     endpoint: Endpoint<QueryItems, RequestBody, ResponseBody>,
     requestBody: RequestBody,
-    queryItems: QueryItems
+    queryItems: QueryItems,
+    headers: [String: String] = [:]
   ) async throws -> ResponseBody {
     let url = url(for: endpoint.path, queryItems: queryItems)
-    let request = try request(url: url, method: endpoint.method, body: requestBody)
+    let request = try request(
+      url: url,
+      method: endpoint.method,
+      body: requestBody,
+      headers: headers
+    )
     let data = try await performRequest(request)
     return try decoder.decode(ResponseBody.self, from: data)
   }
@@ -158,15 +184,19 @@ public actor APIClient {
   /// - Parameters:
   ///   - path: Path appended to the base URL.
   ///   - queryItems: Query string appended to the URL. An empty collection adds no query.
+  ///   - headers: Extra header fields for this call. Values replace any default with
+  ///     the same name.
   /// - Throws: `URLError.badServerResponse` when the status code is outside
   ///   200..<300, or an error raised by `URLSession`.
   public func response<QueryItems: QueryItemsConvertible>(
     _ path: String,
-    queryItems: QueryItems
+    queryItems: QueryItems,
+    headers: [String: String] = [:]
   ) async throws {
     try await response(
       endpoint: VoidBodyEndpoint<QueryItems>(path: path),
-      queryItems: queryItems
+      queryItems: queryItems,
+      headers: headers
     )
   }
 
@@ -177,13 +207,16 @@ public actor APIClient {
   ///   - path: Path appended to the base URL.
   ///   - requestBody: Value encoded as the JSON request body.
   ///   - queryItems: Query string appended to the URL. An empty collection adds no query.
+  ///   - headers: Extra header fields for this call. Values replace any default with
+  ///     the same name.
   /// - Throws: `URLError.badServerResponse` when the status code is outside
   ///   200..<300, an encoding error when `requestBody` cannot be encoded, or an error
   ///   raised by `URLSession`.
   public func response<QueryItems: QueryItemsConvertible, RequestBody: Encodable>(
     _ path: String,
     requestBody: RequestBody,
-    queryItems: QueryItems
+    queryItems: QueryItems,
+    headers: [String: String] = [:]
   ) async throws {
     try await response(
       endpoint: VoidResponseBodyEndpoint<QueryItems, RequestBody>(
@@ -191,7 +224,8 @@ public actor APIClient {
         method: "POST"
       ),
       requestBody: requestBody,
-      queryItems: queryItems
+      queryItems: queryItems,
+      headers: headers
     )
   }
 
@@ -200,17 +234,21 @@ public actor APIClient {
   /// - Parameters:
   ///   - path: Path appended to the base URL.
   ///   - queryItems: Query string appended to the URL. An empty collection adds no query.
+  ///   - headers: Extra header fields for this call. Values replace any default with
+  ///     the same name.
   /// - Returns: The response body decoded as `ResponseBody`.
   /// - Throws: `URLError.badServerResponse` when the status code is outside
   ///   200..<300, a decoding error when the body does not match `ResponseBody`, or an
   ///   error raised by `URLSession`.
   public func response<QueryItems: QueryItemsConvertible, ResponseBody: Decodable>(
     _ path: String,
-    queryItems: QueryItems
+    queryItems: QueryItems,
+    headers: [String: String] = [:]
   ) async throws -> ResponseBody {
     try await response(
       endpoint: VoidRequestBodyEndpoint<QueryItems, ResponseBody>(path: path),
-      queryItems: queryItems
+      queryItems: queryItems,
+      headers: headers
     )
   }
 
@@ -221,6 +259,8 @@ public actor APIClient {
   ///   - path: Path appended to the base URL.
   ///   - requestBody: Value encoded as the JSON request body.
   ///   - queryItems: Query string appended to the URL. An empty collection adds no query.
+  ///   - headers: Extra header fields for this call. Values replace any default with
+  ///     the same name.
   /// - Returns: The response body decoded as `ResponseBody`.
   /// - Throws: `URLError.badServerResponse` when the status code is outside
   ///   200..<300, an encoding error when `requestBody` cannot be encoded, a decoding
@@ -233,7 +273,8 @@ public actor APIClient {
   >(
     _ path: String,
     requestBody: RequestBody,
-    queryItems: QueryItems
+    queryItems: QueryItems,
+    headers: [String: String] = [:]
   ) async throws -> ResponseBody {
     try await response(
       endpoint: Endpoint<QueryItems, RequestBody, ResponseBody>(
@@ -241,7 +282,8 @@ public actor APIClient {
         method: "POST"
       ),
       requestBody: requestBody,
-      queryItems: queryItems
+      queryItems: queryItems,
+      headers: headers
     )
   }
 
@@ -278,21 +320,38 @@ public actor APIClient {
     return data
   }
 
-  private func request(url: URL, method: String) -> URLRequest {
+  private func request(
+    url: URL,
+    method: String,
+    headers: [String: String]
+  ) -> URLRequest {
     var request = URLRequest(url: url)
     request.httpMethod = method
     request.setValue("application/json", forHTTPHeaderField: "Accept")
     if let bearerToken {
       request.setValue("Bearer \(bearerToken)", forHTTPHeaderField: "Authorization")
     }
+    applyHeaders(headers, to: &request)
     return request
   }
 
-  private func request(url: URL, method: String, body: some Encodable) throws -> URLRequest {
-    var request = request(url: url, method: method)
+  private func request(
+    url: URL,
+    method: String,
+    body: some Encodable,
+    headers: [String: String]
+  ) throws -> URLRequest {
+    var request = request(url: url, method: method, headers: [:])
     request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+    applyHeaders(headers, to: &request)
     request.httpBody = try encoder.encode(body)
     return request
+  }
+
+  private func applyHeaders(_ headers: [String: String], to request: inout URLRequest) {
+    for (field, value) in headers {
+      request.setValue(value, forHTTPHeaderField: field)
+    }
   }
 
   private func url(for path: String, queryItems: some QueryItemsConvertible) -> URL {
