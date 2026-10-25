@@ -1,5 +1,8 @@
 import FixtureURLProtocol
 import Foundation
+#if canImport(FoundationNetworking)
+import FoundationNetworking
+#endif
 import Testing
 @testable import APIClient
 
@@ -228,5 +231,53 @@ struct APIClientTests {
     #expect(decoded.latitude == station.latitude)
     #expect(decoded.longitude == station.longitude)
     #expect(decoded.altitude == station.altitude)
+  }
+
+  /// Custom headers add fields and replace defaults with the same name.
+  @Test
+  func responseAppliesCustomHeaders() async throws {
+    let fixture = Fixture()
+    let client = try APIClient(
+      baseURL: #require(URL(string: "https://api.openweathermap.org")),
+      session: fixture.makeSession()
+    )
+    fixture.setResponse(statusCode: 204)
+
+    try await client.response(
+      "data/3.0/stations",
+      queryItems: ["appid": "API_KEY"],
+      headers: [
+        "Accept": "application/json; charset=utf-8",
+        "X-Request-ID": "list-stations"
+      ]
+    )
+
+    let request = try #require(fixture.requests.last)
+
+    #expect(request.value(forHTTPHeaderField: "Accept") == "application/json; charset=utf-8")
+    #expect(request.value(forHTTPHeaderField: "X-Request-ID") == "list-stations")
+    #expect(request.value(forHTTPHeaderField: "Authorization") == nil)
+  }
+
+  /// A non-nil `bearerToken` is sent as `Authorization: Bearer <token>`.
+  @Test
+  func responseSendsTheBearerToken() async throws {
+    let fixture = Fixture()
+    let client = try APIClient(
+      baseURL: #require(URL(string: "https://api.openweathermap.org")),
+      bearerToken: "TOKEN",
+      session: fixture.makeSession()
+    )
+    fixture.setResponse(statusCode: 204)
+
+    try await client.response(
+      "data/3.0/stations",
+      queryItems: ["appid": "API_KEY"]
+    )
+
+    let request = try #require(fixture.requests.last)
+
+    #expect(request.value(forHTTPHeaderField: "Authorization") == "Bearer TOKEN")
+    #expect(request.value(forHTTPHeaderField: "Accept") == "application/json")
   }
 }
