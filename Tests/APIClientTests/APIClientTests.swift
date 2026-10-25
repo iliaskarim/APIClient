@@ -69,16 +69,14 @@ struct APIClientTests {
 
   /// [DELETE /stations/{id}](https://openweathermap.org/api/stations#delete_station).
   ///
-  /// No request body, empty response. Query items come from a custom type. Custom
-  /// headers are applied on top of the default `Accept`.
+  /// No request body, empty response. Query items come from a custom type.
   @Test
   func responseSendsNoBodyAndAcceptsAnEmptyResponse() async throws {
     Self.fixture.setResponse(statusCode: 204)
 
     try await Self.client.response(
       endpoint: .init(path: "data/3.0/stations/station-1", method: "DELETE"),
-      queryItems: AppIDQuery(appid: "API_KEY"),
-      headers: ["X-Request-ID": "delete-station-1"]
+      queryItems: AppIDQuery(appid: "API_KEY")
     )
 
     let request = try #require(Self.fixture.requests.last)
@@ -88,7 +86,6 @@ struct APIClientTests {
     #expect(request.value(forHTTPHeaderField: "Accept") == "application/json")
     #expect(request.value(forHTTPHeaderField: "Content-Type") == nil)
     #expect(request.value(forHTTPHeaderField: "Authorization") == nil)
-    #expect(request.value(forHTTPHeaderField: "X-Request-ID") == "delete-station-1")
     #expect(request.httpBody == nil)
     #expect(components.scheme == "https")
     #expect(components.host == "api.openweathermap.org")
@@ -98,7 +95,7 @@ struct APIClientTests {
 
   /// [GET /stations](https://openweathermap.org/api/stations#get_stations).
   ///
-  /// No request body, decoded response. A custom `Accept` replaces the default.
+  /// No request body, decoded response.
   @Test
   func responseSendsNoBodyAndDecodesTheResponse() async throws {
     Self.fixture.setResponse(
@@ -121,15 +118,14 @@ struct APIClientTests {
 
     let decoded: [Station] = try await Self.client.response(
       "data/3.0/stations",
-      queryItems: ["appid": "API_KEY"],
-      headers: ["Accept": "application/json; charset=utf-8"]
+      queryItems: ["appid": "API_KEY"]
     )
 
     let request = try #require(Self.fixture.requests.last)
     let (components, items) = try request.componentsAndQueryItems()
 
     #expect(request.httpMethod == "GET")
-    #expect(request.value(forHTTPHeaderField: "Accept") == "application/json; charset=utf-8")
+    #expect(request.value(forHTTPHeaderField: "Accept") == "application/json")
     #expect(request.value(forHTTPHeaderField: "Content-Type") == nil)
     #expect(request.value(forHTTPHeaderField: "Authorization") == nil)
     #expect(request.httpBody == nil)
@@ -162,8 +158,7 @@ struct APIClientTests {
     try await Self.client.response(
       "data/3.0/measurements",
       requestBody: [measurement],
-      queryItems: ["appid": "API_KEY"],
-      headers: ["X-Request-ID": "post-measurements"]
+      queryItems: ["appid": "API_KEY"]
     )
 
     let request = try #require(Self.fixture.requests.last)
@@ -174,7 +169,6 @@ struct APIClientTests {
     #expect(request.value(forHTTPHeaderField: "Accept") == "application/json")
     #expect(request.value(forHTTPHeaderField: "Content-Type") == "application/json")
     #expect(request.value(forHTTPHeaderField: "Authorization") == nil)
-    #expect(request.value(forHTTPHeaderField: "X-Request-ID") == "post-measurements")
     #expect(request.httpBody == encoded)
     #expect(components.scheme == "https")
     #expect(components.host == "api.openweathermap.org")
@@ -215,8 +209,7 @@ struct APIClientTests {
     let decoded: Station = try await Self.client.response(
       "data/3.0/stations",
       requestBody: station,
-      queryItems: ["appid": "API_KEY"],
-      headers: ["Content-Type": "application/json; charset=utf-8"]
+      queryItems: ["appid": "API_KEY"]
     )
 
     let request = try #require(Self.fixture.requests.last)
@@ -225,9 +218,7 @@ struct APIClientTests {
 
     #expect(request.httpMethod == "POST")
     #expect(request.value(forHTTPHeaderField: "Accept") == "application/json")
-    #expect(
-      request.value(forHTTPHeaderField: "Content-Type") == "application/json; charset=utf-8"
-    )
+    #expect(request.value(forHTTPHeaderField: "Content-Type") == "application/json")
     #expect(request.value(forHTTPHeaderField: "Authorization") == nil)
     #expect(request.httpBody == encoded)
     #expect(components.scheme == "https")
@@ -240,5 +231,53 @@ struct APIClientTests {
     #expect(decoded.latitude == station.latitude)
     #expect(decoded.longitude == station.longitude)
     #expect(decoded.altitude == station.altitude)
+  }
+
+  /// Custom headers add fields and replace defaults with the same name.
+  @Test
+  func responseAppliesCustomHeaders() async throws {
+    let fixture = Fixture()
+    let client = APIClient(
+      baseURL: URL(string: "https://api.openweathermap.org")!,
+      session: fixture.makeSession()
+    )
+    fixture.setResponse(statusCode: 204)
+
+    try await client.response(
+      "data/3.0/stations",
+      queryItems: ["appid": "API_KEY"],
+      headers: [
+        "Accept": "application/json; charset=utf-8",
+        "X-Request-ID": "list-stations"
+      ]
+    )
+
+    let request = try #require(fixture.requests.last)
+
+    #expect(request.value(forHTTPHeaderField: "Accept") == "application/json; charset=utf-8")
+    #expect(request.value(forHTTPHeaderField: "X-Request-ID") == "list-stations")
+    #expect(request.value(forHTTPHeaderField: "Authorization") == nil)
+  }
+
+  /// A non-nil `bearerToken` is sent as `Authorization: Bearer <token>`.
+  @Test
+  func responseSendsTheBearerToken() async throws {
+    let fixture = Fixture()
+    let client = APIClient(
+      baseURL: URL(string: "https://api.openweathermap.org")!,
+      bearerToken: "TOKEN",
+      session: fixture.makeSession()
+    )
+    fixture.setResponse(statusCode: 204)
+
+    try await client.response(
+      "data/3.0/stations",
+      queryItems: ["appid": "API_KEY"]
+    )
+
+    let request = try #require(fixture.requests.last)
+
+    #expect(request.value(forHTTPHeaderField: "Authorization") == "Bearer TOKEN")
+    #expect(request.value(forHTTPHeaderField: "Accept") == "application/json")
   }
 }

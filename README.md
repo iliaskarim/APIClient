@@ -52,8 +52,7 @@ let client = APIClient(
 ```swift
 let stations: [Station] = try await client.response(
   "data/3.0/stations",
-  queryItems: ["appid": apiKey],
-  headers: ["X-Request-ID": "list-stations"]
+  queryItems: ["appid": apiKey]
 )
 ```
 
