@@ -237,8 +237,8 @@ struct APIClientTests {
   @Test
   func responseAppliesCustomHeaders() async throws {
     let fixture = Fixture()
-    let client = APIClient(
-      baseURL: URL(string: "https://api.openweathermap.org")!,
+    let client = try APIClient(
+      baseURL: #require(URL(string: "https://api.openweathermap.org")),
       session: fixture.makeSession()
     )
     fixture.setResponse(statusCode: 204)
@@ -263,8 +263,8 @@ struct APIClientTests {
   @Test
   func responseSendsTheBearerToken() async throws {
     let fixture = Fixture()
-    let client = APIClient(
-      baseURL: URL(string: "https://api.openweathermap.org")!,
+    let client = try APIClient(
+      baseURL: #require(URL(string: "https://api.openweathermap.org")),
       bearerToken: "TOKEN",
       session: fixture.makeSession()
     )
